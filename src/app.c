@@ -1,7 +1,9 @@
+#include <assert.h>
 #include <math.h>
 #include <stdio.h>
 
 #include <par/par_camera_control.h>
+#include <par/par_msquares.h>
 #include <par/par_shaders.h>
 
 #include <stb/stb_image.h>
@@ -48,6 +50,40 @@ void app_update_projection(App* app) {
     camera_set_aspect(app->camera, vpwidth / vpheight);
     camera_perspective(app->camera, CAMERA_FOV_HORIZONTAL, kFov, kNearPlane, kFarPlane);
     camera_get_projection_matrixf(app->camera, app->gfx.uniforms.projection);
+}
+
+static void create_mesh(App* app, const char* filename) {
+    int nchan;
+    int width, height;
+    stbi_uc* u8_data = stbi_load(filename, &width, &height, &nchan, 1);
+    assert(u8_data);
+    float* float_data = malloc(sizeof(float) * width * height);
+    for (int i = 0; i < width * height; i++) {
+        float_data[i] = (float)u8_data[i] / 255.0f;
+    }
+    stbi_image_free(u8_data);
+
+    const int cellsize = 10;
+
+    const float thresholds[5] = {
+        .15f, .30f, .45f, .60f, .75f,
+    };
+
+    par_msquares_meshlist* meshes =
+        par_msquares_grayscale_multi(float_data, width, height, cellsize, thresholds, 5,
+                                     PAR_MSQUARES_SIMPLIFY | PAR_MSQUARES_HEIGHTS);
+
+    assert(meshes);
+
+    int num_meshes = par_msquares_get_count(meshes);
+    printf("%d meshes\n", num_meshes);
+
+    par_msquares_mesh const* mesh = par_msquares_get_mesh(meshes, 0);
+    printf("mesh 0 : %d verts, %d triangles (dim = %d)\n", mesh->npoints, mesh->ntriangles,
+           mesh->dim);
+
+    par_msquares_free(meshes);
+    free(float_data);
 }
 
 static void create_texture(App* app, const char* filename, int* width, int* height) {
@@ -109,6 +145,10 @@ void app_init(App* app) {
     create_texture(app, "extras/terrain/terrain.png", &width, &height);
     printf("Loaded %dx%d texture in %.0f ms\n", width, height,
            stm_ms(stm_diff(stm_now(), start_decode)));
+
+    const uint64_t start_mesh = stm_now();
+    create_mesh(app, "extras/terrain/elevation.png");
+    printf("Created mesh in %.0f ms\n", stm_ms(stm_diff(stm_now(), start_mesh)));
 
     positions[1].x = positions[2].x = width;
     positions[2].y = positions[3].y = height;

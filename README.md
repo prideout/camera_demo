@@ -4,4 +4,5 @@ Easy to build on macOS. First make sure you have CMake and clang installed, then
 
 # TODO
 
-- Show quantized terrain from snowy and par_msquares
+- mipmapping
+- par_msquares

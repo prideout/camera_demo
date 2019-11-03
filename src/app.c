@@ -4,6 +4,8 @@
 #include <par/par_camera_control.h>
 #include <par/par_shaders.h>
 
+#include <stb/stb_image.h>
+
 #include <sokol/sokol_gfx.h>
 #include <sokol/sokol_time.h>
 
@@ -18,19 +20,32 @@ typedef struct {
     float x, y;
 } vec2;
 
-static const vec4 positions[] = {
-    {-1, -1, 0, 1},  // 0
-    {+1, -1, 0, 1},  // 1
-    {+1, +1, 0, 1},  // 2
-    {-1, +1, 0, 1},  // 3
+static vec4 positions[] = {
+    {0, 0, 0, 1},  // 0
+    {1, 0, 0, 1},  // 1
+    {1, 1, 0, 1},  // 2
+    {0, 1, 0, 1},  // 3
 };
 
 static const vec2 texcoords[] = {
-    {0, 0},  // 0
-    {1, 0},  // 1
-    {1, 1},  // 2
-    {0, 1},  // 3
+    {0, 1},  // 0
+    {1, 1},  // 1
+    {1, 0},  // 2
+    {0, 0},  // 3
 };
+
+static const uint16_t indices[] = {
+    0, 1, 2,  //
+    2, 3, 0,  //
+};
+
+void app_update_projection(App* app) {
+    const float vpwidth = sapp_width() - kSidebarWidth;
+    const float vpheight = sapp_height();
+    camera_set_aspect(app->camera, vpwidth / vpheight);
+    camera_perspective(app->camera, CAMERA_FOV_HORIZONTAL, kFov, kNearPlane, kFarPlane);
+    camera_get_projection_matrixf(app->camera, app->gfx.uniforms.projection);
+}
 
 void app_init(App* app) {
     stm_setup();
@@ -41,16 +56,49 @@ void app_init(App* app) {
         .mtl_drawable_cb = sapp_metal_get_drawable,
     });
 
+    const uint64_t start_decode = stm_now();
+    int width, height, nchan;
+    stbi_uc* rgba = stbi_load("extras/terrain/terrain.png", &width, &height, &nchan, 4);
+    app->gfx.texture = sg_make_image(&(sg_image_desc){
+        .width = width,
+        .height = height,
+        .min_filter = SG_FILTER_LINEAR,
+        .mag_filter = SG_FILTER_LINEAR,
+        .content.subimage[0][0].ptr = rgba,
+        .content.subimage[0][0].size = width * height * 4,
+    });
+    stbi_image_free(rgba);
+    printf("Texture decode (%dx%d) in %.0f ms\n", width, height,
+           stm_ms(stm_diff(stm_now(), start_decode)));
+
+    positions[1].x = positions[2].x = width;
+    positions[2].y = positions[3].y = height;
+
     app->camera = camera_create();
+
+    app_update_projection(app);
+
+    const float vpwidth = sapp_width() - kSidebarWidth;
+    const float vpheight = sapp_height();
+    const float fovy = camera_get_fovy_radians(app->camera);
+    const float fovx = fovy * vpwidth / vpheight;
+    const float kInitialDistance = width / tanf(fovx);
+    const float eyepos[] = {width / 2.0f, height / 2.0f, kInitialDistance};
+    const float target[] = {width / 2.0f, height / 2.0f, 0};
+    const float upward[] = {0, 1, 0};
+    camera_look_atf(app->camera, eyepos, target, upward);
+    printf("Distance is %f\n", kInitialDistance);
+
     app->camera_controller = parcc_create_context((parcc_config){
         .mode = PARCC_ORBIT,
         .viewport_width = 100,
         .viewport_height = 100,
-        .fov_direction = PARCC_VERTICAL,
+        .fov_direction = PARCC_HORIZONTAL,
         .fov_radians = M_PI / 3,
         .content_aabb.min_corner = {0, 0, 0},
         .content_aabb.max_corner = {0, 0, 0},
     });
+
     app->gui = gui_create(app, kSidebarWidth);
 
     parsh_context* shaders = parsh_create_context_from_file("src/demo.glsl");
@@ -68,12 +116,20 @@ void app_init(App* app) {
         .content = texcoords,
     });
 
-    app->gfx.num_elements = 4;
+    sg_buffer index_buffer = sg_make_buffer(&(sg_buffer_desc){
+        .size = sizeof(indices),
+        .usage = SG_USAGE_IMMUTABLE,
+        .content = indices,
+        .type = SG_BUFFERTYPE_INDEXBUFFER,
+    });
+
+    app->gfx.num_elements = 6;
 
     app->gfx.bindings = (sg_bindings){
         .vertex_buffers[0] = positions_buffer,  //
         .vertex_buffers[1] = texcoords_buffer,
-        //.fs_images[0] = fullscreen_texture,
+        .fs_images[0] = app->gfx.texture,
+        .index_buffer = index_buffer,
     };
 
     sg_shader program = sg_make_shader(&(sg_shader_desc){
@@ -84,8 +140,8 @@ void app_init(App* app) {
         .vs.uniform_blocks[0].uniforms[1].type = SG_UNIFORMTYPE_MAT4,
         .vs.uniform_blocks[0].uniforms[2].name = "projection",
         .vs.uniform_blocks[0].uniforms[2].type = SG_UNIFORMTYPE_MAT4,
-        // .fs.images[0].name = "tex",
-        // .fs.images[0].type = SG_IMAGETYPE_2D,
+        .fs.images[0].name = "terrain",
+        .fs.images[0].type = SG_IMAGETYPE_2D,
         .vs.source = parsh_get_blocks(shaders, "prefix terrain.vs"),
         .fs.source = parsh_get_blocks(shaders, "prefix terrain.fs"),
     });
@@ -95,21 +151,18 @@ void app_init(App* app) {
         .blend.enabled = false,
         .depth_stencil.depth_write_enabled = false,
         .rasterizer.cull_mode = SG_CULLMODE_NONE,
+        .index_type = SG_INDEXTYPE_UINT16,
         .layout.attrs[0].format = SG_VERTEXFORMAT_FLOAT4,
         .layout.attrs[0].buffer_index = 0,
         .layout.attrs[1].format = SG_VERTEXFORMAT_FLOAT2,
         .layout.attrs[1].buffer_index = 1,
     });
-
-    app->gfx.transition = (sg_pass_action){
-        .colors[0].action = SG_ACTION_CLEAR,
-        .colors[0].val = {0.0f, 0.0f, 0.0f, 0.0f},
-    };
 }
 
 void app_draw(App* app) {
     const double seconds = stm_sec(stm_now());
     app_update_projection(app);
+
     if (app->transition.van_wijk) {
         const CameraTransition trans = app->transition;
         const double duration = parcc_get_interpolation_duration(trans.source, trans.target);
@@ -145,6 +198,7 @@ void app_draw(App* app) {
     sg_apply_viewport(kSidebarWidth, 0, vp_width, vp_height, false);
     sg_apply_pipeline(app->gfx.pipeline);
     sg_apply_bindings(&app->gfx.bindings);
+    sg_apply_uniforms(SG_SHADERSTAGE_VS, 0, &app->gfx.uniforms, sizeof(Uniforms));
     sg_draw(0, app->gfx.num_elements, 1);
 
     sg_apply_viewport(0, 0, sapp_width(), vp_height, false);
@@ -162,12 +216,4 @@ void app_start_camera_transition(App* app) {
     app->transition.source = parcc_get_current_frame(app->camera_controller);
     app->transition.target = parcc_get_home_frame(app->camera_controller, 10.0);
     app->transition.van_wijk = true;
-}
-
-void app_update_projection(App* app) {
-    const float vpwidth = sapp_width() - kSidebarWidth;
-    const float vpheight = sapp_height();
-    camera_set_aspect(app->camera, vpwidth / vpheight);
-    camera_perspective(app->camera, CAMERA_FOV_VERTICAL, kFov, kNearPlane, kFarPlane);
-    camera_get_projection_matrixf(app->camera, app->gfx.uniforms.projection);
 }

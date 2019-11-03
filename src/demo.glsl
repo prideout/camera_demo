@@ -1,8 +1,8 @@
 -- terrain.vs
 
 layout(location=0) in vec4 position;
-layout(location=1) in vec3 normal;
-layout(location=2) in vec2 uv;
+layout(location=1) in vec2 uv;
+layout(location=2) in vec3 normal;
 
 uniform mat4 modelview;
 uniform mat4 inverse_modelview;
@@ -22,8 +22,10 @@ void main() {
 in vec2 vuv;
 in vec4 vcolor;
 
+uniform sampler2D terrain;
+
 out vec4 frag_color;
 
 void main() {
-    frag_color = vec4(vuv, 0, 1);
+    frag_color = texture(terrain, vuv);
 }

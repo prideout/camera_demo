@@ -10,7 +10,7 @@
 #define kSidebarWidth (300)
 #define kFov (33)
 #define kNearPlane (1)
-#define kFarPlane (1000)
+#define kFarPlane (10000)
 
 typedef enum { VISUAL_MODE_2D, VISUAL_MODE_3D } VisualMode;
 
@@ -26,7 +26,6 @@ typedef struct {
     sg_bindings bindings;
     sg_image_desc texture_desc;
     sg_image texture;
-    sg_pass_action transition;
     int num_elements;
 } GraphicsState;
 

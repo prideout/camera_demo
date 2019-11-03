@@ -4,6 +4,7 @@
 #define PAR_CAMERA_CONTROL_IMPLEMENTATION
 #define PAR_SHADERS_IMPLEMENTATION
 #define PAR_MSQUARES_IMPLEMENTATION
+#define STB_IMAGE_RESIZE_IMPLEMENTATION
 #define STB_IMAGE_IMPLEMENTATION
 #define STBI_ONLY_PNG
 
@@ -16,3 +17,4 @@
 #include <sokol/sokol_time.h>
 
 #include <stb/stb_image.h>
+#include <stb/stb_image_resize.h>

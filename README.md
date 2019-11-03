@@ -4,5 +4,4 @@ Easy to build on macOS. First make sure you have CMake and clang installed, then
 
 # TODO
 
-- mipmapping
 - par_msquares

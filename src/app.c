@@ -5,12 +5,15 @@
 #include <par/par_shaders.h>
 
 #include <stb/stb_image.h>
+#include <stb/stb_image_resize.h>
 
 #include <sokol/sokol_gfx.h>
 #include <sokol/sokol_time.h>
 
 #include "app.h"
 #include "vec_float.h"
+
+#define IMAX(a, b) (a > b ? a : b)
 
 typedef struct {
     float x, y, z, w;
@@ -47,6 +50,51 @@ void app_update_projection(App* app) {
     camera_get_projection_matrixf(app->camera, app->gfx.uniforms.projection);
 }
 
+static void create_texture(App* app, const char* filename, int* width, int* height) {
+    int nchan;
+    stbi_uc* mip0 = stbi_load(filename, width, height, &nchan, 4);
+    int mip0size = 4 * *width * *height;
+
+    sg_image_desc image_desc = {
+        .width = *width,
+        .height = *height,
+        .min_filter = SG_FILTER_LINEAR_MIPMAP_LINEAR,
+        .mag_filter = SG_FILTER_LINEAR,
+        .content.subimage[0][0].ptr = mip0,
+        .content.subimage[0][0].size = mip0size,
+    };
+
+    stbi_uc* pmip = mip0;
+    int pwidth = *width;
+    int pheight = *height;
+    int level;
+    for (level = 1; level < SG_MAX_MIPMAPS; level++) {
+        int hwidth = IMAX(pwidth / 2, 1);
+        int hheight = IMAX(pheight / 2, 1);
+        stbi_uc* hmip = malloc(hwidth * hheight * 4);
+        if (!stbir_resize_uint8(pmip, pwidth, pheight, 0, hmip, hwidth, hheight, 0, 4)) {
+            puts("Error with mipmap generation.\n");
+        }
+        image_desc.content.subimage[0][level].ptr = hmip;
+        image_desc.content.subimage[0][level].size = hwidth * hheight * 4;
+        if (hwidth == 1 && hheight == 1) {
+            break;
+        }
+        pwidth = hwidth;
+        pheight = hheight;
+        pmip = hmip;
+    }
+
+    image_desc.num_mipmaps = level + 1;
+
+    app->gfx.texture = sg_make_image(&image_desc);
+
+    stbi_image_free(mip0);
+    for (level = 1; level < SG_MAX_MIPMAPS; level++) {
+        free((void*)image_desc.content.subimage[0][level].ptr);
+    }
+}
+
 void app_init(App* app) {
     stm_setup();
 
@@ -57,18 +105,9 @@ void app_init(App* app) {
     });
 
     const uint64_t start_decode = stm_now();
-    int width, height, nchan;
-    stbi_uc* rgba = stbi_load("extras/terrain/terrain.png", &width, &height, &nchan, 4);
-    app->gfx.texture = sg_make_image(&(sg_image_desc){
-        .width = width,
-        .height = height,
-        .min_filter = SG_FILTER_LINEAR,
-        .mag_filter = SG_FILTER_LINEAR,
-        .content.subimage[0][0].ptr = rgba,
-        .content.subimage[0][0].size = width * height * 4,
-    });
-    stbi_image_free(rgba);
-    printf("Texture decode (%dx%d) in %.0f ms\n", width, height,
+    int width, height;
+    create_texture(app, "extras/terrain/terrain.png", &width, &height);
+    printf("Loaded %dx%d texture in %.0f ms\n", width, height,
            stm_ms(stm_diff(stm_now(), start_decode)));
 
     positions[1].x = positions[2].x = width;

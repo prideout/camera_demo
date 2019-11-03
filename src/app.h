@@ -2,6 +2,8 @@
 
 #include <par/par_camera_control.h>
 
+#include <sokol/sokol_gfx.h>
+
 #include "camera.h"
 #include "gui.h"
 
@@ -45,5 +47,5 @@ typedef struct App {
 } App;
 
 void app_init(App* app);
-void app_start_camera_transition(App* app, int tile_index);
+void app_start_camera_transition(App* app);
 void app_update_projection(App* app);

@@ -5,6 +5,8 @@
 #include "app.h"
 
 #include <microui/microui.h>
+
+#include <sokol/sokol_gfx.h>
 #include <sokol/util/sokol_gl.h>
 
 #include <stdio.h>
@@ -37,164 +39,52 @@ static void define_ui(Gui* gui) {
     gui->window.rect.w = gui->sidebar_width;
     gui->window.rect.h = sapp_height();
 
-    const int htile = app->hover_tile;
-    const int stile = app->selected_tile;
-    const size_t ncols = app->tile_db.num_columns;
-    const size_t nrows = app->tile_db.num_rows;
-    const int row = htile / ncols;
-    const int col = htile % ncols;
-    const size_t ntiles = app->tile_db.num_active_tiles;
-    char buf[64];
-    char tooltip[64] = {0};
-
     mu_begin_window_ex(ctx, &gui->window, "", MU_OPT_NOTITLE | MU_OPT_NORESIZE);
-    mu_layout_row(ctx, 3, (int[]){93, 93, 93}, 0);
 
-    const char* kNewGrid = "New";
-    if (mu_button(ctx, kNewGrid) || gui->open_load_dialog) {
-        gui->open_load_dialog = true;
-    }
-    if (ctx->hover == ctx->last_id) {
-        sprintf(tooltip, "shortcut: N");
-    }
+    const parcc_config config = parcc_get_config(app->camera_controller);
+    parcc_config new_config = config;
 
-    const char* kLoadGrid = "Load";
-    mu_button(ctx, kLoadGrid);
-    if (ctx->hover == ctx->last_id) {
-        sprintf(tooltip, "shortcut: L");
-    }
+    mu_layout_row(ctx, 2, (int[]){-1, -1}, 0);
+    int orbit = config.mode == PARCC_ORBIT;
+    int map = config.mode == PARCC_MAP;
+    mu_checkbox(ctx, &orbit, "Orbit mode");
+    mu_checkbox(ctx, &map, "Map mode");
+    new_config.mode = orbit ? PARCC_ORBIT : PARCC_MAP;
 
-    const char* kSaveGrid = "Save";
-    mu_button(ctx, kSaveGrid);
-    if (ctx->hover == ctx->last_id) {
-        sprintf(tooltip, "shortcut: S");
-    }
+    int show_fov = 1;
+    mu_header(ctx, &show_fov, "Field of view");
+    int vert = config.fov_direction == PARCC_VERTICAL;
+    int horiz = config.fov_direction == PARCC_HORIZONTAL;
+    mu_checkbox(ctx, &vert, "Vertical");
+    mu_checkbox(ctx, &horiz, "Horizontal");
+    new_config.fov_direction = vert ? PARCC_VERTICAL : PARCC_HORIZONTAL;
 
-    if (app->hover_tile == -1) {
-        mu_label(ctx, "--");
-    } else {
-        sprintf(buf, "%c%d   (%d, %d)", 'A' + col, row + 1, col, row);
-        mu_label(ctx, buf);
-    }
-    sprintf(buf, "%zu x %zu", ncols, nrows);
-    mu_label(ctx, buf);
-    sprintf(buf, "%zu active tiles.", ntiles);
-    mu_label(ctx, buf);
-
-    mu_layout_row(ctx, 2, (int[]){50, 50}, 0);
-
-    // 2D / 3D radio buttons.
-    ctx->style->colors[MU_COLOR_TEXT] = kActiveColor;
-    ctx->style->spacing = 0;
-    mu_button(ctx, "2D");
-    if (ctx->hover == ctx->last_id) {
-        sprintf(tooltip, "shortcut: 2");
-    }
-    ctx->style->colors[MU_COLOR_TEXT] = kDisabledColor;
-    ctx->style->spacing = 4;
-    mu_button(ctx, "3D");
-    if (ctx->hover == ctx->last_id) {
-        sprintf(tooltip, "shortcut: 3");
-    }
-    ctx->style->colors[MU_COLOR_TEXT] = kActiveColor;
-
-    // Toggle / Select radio buttons.
-
-    mu_layout_row(ctx, 2, (int[]){146, -1}, 0);
-    int show = app->show_edges;
-    mu_checkbox(ctx, &show, "Show edges");
-    app->show_edges = show;
-    if (ctx->hover == ctx->last_id) {
-        sprintf(tooltip, "shortcut: C");
-    }
-
-    mu_layout_row(ctx, 2, (int[]){146, -1}, 0);
-    if (mu_button(ctx, "Nav to Center")) {
-        app_start_camera_transition(app, -1);
-    }
-    if (ctx->hover == ctx->last_id) {
-        sprintf(tooltip, "shortcut: Spacebar");
-    }
-
-    if (stile != -1) {
-        const int row = stile / ncols;
-        const int col = stile % ncols;
-        sprintf(buf, "Nav to %c%d", 'A' + col, row + 1);
-        if (mu_button(ctx, buf)) {
-            app_start_camera_transition(app, stile);
-        }
-        if (ctx->hover == ctx->last_id) {
-            sprintf(tooltip, "shortcut: G");
-        }
-    } else {
-        mu_label(ctx, "");
-    }
+    mu_label(ctx, "Degrees");
+    float degrees = new_config.fov_radians * 180.0f / M_PI;
+    mu_slider(ctx, &degrees, 10, 90);
+    new_config.fov_radians = degrees * M_PI / 180.0f;
 
     mu_layout_row(ctx, 1, (int[]){-1}, 0);
-    ctx->style->colors[MU_COLOR_TEXT] = kTooltipColor;
 
-    if (tooltip[0]) {
-        mu_label(ctx, tooltip);
-    }
+    int raycast = 0;
+    mu_checkbox(ctx, &raycast, "Raycast");
 
-    if (app->selected_segment != TileCenter) {
-        const int srow = stile / ncols;
-        const int scol = stile % ncols;
-        if (app->hover_tile == -1 || !TILE_IS_ACTIVE(app->tile_db.states, app->hover_tile)) {
-            sprintf(buf, "Connecting %c%d...", 'A' + scol, srow + 1);
-        } else {
-            const int hrow = app->hover_tile / ncols;
-            const int hcol = app->hover_tile % ncols;
-            sprintf(buf, "Connecting %c%d to %c%d...", 'A' + scol, srow + 1, 'A' + hcol, hrow + 1);
-        }
-        mu_label(ctx, buf);
-    }
+    mu_button(ctx, "Jump to Home Frame");
 
-    ctx->style->colors[MU_COLOR_TEXT] = kActiveColor;
+    mu_layout_row(ctx, 3, (int[]){-1, -1, -1}, 0);
+    mu_button(ctx, "Save as Frame A");
+    mu_button(ctx, "Jump to Frame A");
+    mu_button(ctx, "Highlight Frame A");
+
+    mu_button(ctx, "Save as Frame B");
+    mu_button(ctx, "Jump to Frame B");
+    mu_button(ctx, "Highlight Frame B");
 
     mu_end_window(ctx);
 
-    static char kNewGridSize[60];
-
-    if (gui->open_load_dialog) {
-        mu_open_popup(ctx, &gui->load_dialog);
-        sprintf(kNewGridSize, "%zu x %zu", ncols, nrows);
-    }
-
-    if (mu_begin_popup(ctx, &gui->load_dialog)) {
-        mu_layout_row(ctx, 2, (int[]){110, 70}, 0);
-        mu_label(ctx, "Enter new grid size:");
-        int submitted = 0;
-        if (mu_textbox(ctx, kNewGridSize, sizeof(kNewGridSize)) & MU_RES_SUBMIT) {
-            mu_set_focus(ctx, ctx->last_id);
-            submitted = 1;
-        }
-        if (gui->open_load_dialog) {
-            mu_set_focus(ctx, ctx->last_id);
-            gui->open_load_dialog = false;
-        }
-        mu_layout_row(ctx, 2, (int[]){30, 50}, 0);
-        if (mu_button(ctx, "Ok")) {
-            submitted = 1;
-        }
-        char* divider = strchr(kNewGridSize, 'x');
-        if (submitted && divider) {
-            *divider = 0;
-            int width = atoi(kNewGridSize) & 255;
-            int height = atoi(divider + 1) & 255;
-            if (width > 0 && height > 0) {
-                app_new_grid(app, width, height);
-                gui->load_dialog.open = 0;
-            }
-        }
-        if (mu_button(ctx, "Cancel")) {
-            gui->load_dialog.open = 0;
-        }
-        if (submitted && gui->load_dialog.open) {
-            puts("Bad format in size string.");
-        }
-        mu_end_popup(ctx);
-    }
+    // if (config != new_config) {
+    //     parcc_set_config(app->camera_controller, new_config);
+    // }
 
     mu_end(ctx);
 }
@@ -277,18 +167,8 @@ bool gui_handle(Gui* gui, const sapp_event* ev) {
             if (key == 27) {
                 sapp_request_quit();
             }
-            if (key == 'c') {
-                gui->app->show_edges = !gui->app->show_edges;
-                gui->app->edge_gfx.dirty = true;
-            }
-            if (key == 'n') {
-                gui->open_load_dialog = true;
-            }
-            if (key == 'g' && gui->app->selected_tile != -1) {
-                app_start_camera_transition(gui->app, gui->app->selected_tile);
-            }
-            if (key == ' ') {
-                app_start_camera_transition(gui->app, -1);
+            if (key == 'g') {
+                app_start_camera_transition(gui->app);
             }
             break;
         }

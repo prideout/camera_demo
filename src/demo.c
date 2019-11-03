@@ -1,18 +1,8 @@
 #include <sokol/sokol_app.h>
-#include <sokol/sokol_time.h>
 
 #include "app.h"
-#include "gui.h"
-#include "vec_float.h"
 
 static App app = {0};
-
-static void init() {
-    stm_setup();
-    app_init(&app);
-}
-
-static void draw() { app_draw(&app, stm_sec(stm_now())); }
 
 static void handler(const sapp_event* event) {
     static float mouse_down_pos[2] = {0};
@@ -54,14 +44,14 @@ static void handler(const sapp_event* event) {
     }
 }
 
-static void cleanup() { sg_shutdown(); }
+static void init() { app_init(&app); }
+static void draw() { app_draw(&app); }
 
 sapp_desc sokol_main(int argc, char* argv[]) {
     return (sapp_desc){
         .init_cb = init,
         .frame_cb = draw,
         .event_cb = handler,
-        .cleanup_cb = cleanup,
         .width = 1280,
         .height = 720,
         .sample_count = 16,

@@ -1,6 +1,7 @@
 #include <math.h>
 #include <stdio.h>
 
+#include <par/par_camera_control.h>
 #include <par/par_shaders.h>
 
 #include <sokol/sokol_gfx.h>
@@ -32,14 +33,28 @@ static const vec2 texcoords[] = {
 };
 
 void app_init(App* app) {
+    stm_setup();
+
     sg_setup(&(sg_desc){
         .mtl_device = sapp_metal_get_device(),
         .mtl_renderpass_descriptor_cb = sapp_metal_get_renderpass_descriptor,
         .mtl_drawable_cb = sapp_metal_get_drawable,
     });
 
+    app->camera = camera_create();
+    app->camera_controller = parcc_create_context((parcc_config){
+        .mode = PARCC_ORBIT,
+        .viewport_width = 100,
+        .viewport_height = 100,
+        .fov_direction = PARCC_VERTICAL,
+        .fov_radians = M_PI / 3,
+        .content_aabb.min_corner = {0, 0, 0},
+        .content_aabb.max_corner = {0, 0, 0},
+    });
     app->gui = gui_create(app, kSidebarWidth);
+
     parsh_context* shaders = parsh_create_context_from_file("src/demo.glsl");
+    parsh_add_block(shaders, "prefix", "#version 330\n");
 
     sg_buffer positions_buffer = sg_make_buffer(&(sg_buffer_desc){
         .size = sizeof(positions),
@@ -53,6 +68,8 @@ void app_init(App* app) {
         .content = texcoords,
     });
 
+    app->gfx.num_elements = 4;
+
     app->gfx.bindings = (sg_bindings){
         .vertex_buffers[0] = positions_buffer,  //
         .vertex_buffers[1] = texcoords_buffer,
@@ -60,9 +77,13 @@ void app_init(App* app) {
     };
 
     sg_shader program = sg_make_shader(&(sg_shader_desc){
-        .fs.uniform_blocks[0].size = sizeof(vec4),
-        .fs.uniform_blocks[0].uniforms[0].name = "resolution",
-        .fs.uniform_blocks[0].uniforms[0].type = SG_UNIFORMTYPE_FLOAT4,
+        .vs.uniform_blocks[0].size = sizeof(Uniforms),
+        .vs.uniform_blocks[0].uniforms[0].name = "modelview",
+        .vs.uniform_blocks[0].uniforms[0].type = SG_UNIFORMTYPE_MAT4,
+        .vs.uniform_blocks[0].uniforms[1].name = "inverse_modelview",
+        .vs.uniform_blocks[0].uniforms[1].type = SG_UNIFORMTYPE_MAT4,
+        .vs.uniform_blocks[0].uniforms[2].name = "projection",
+        .vs.uniform_blocks[0].uniforms[2].type = SG_UNIFORMTYPE_MAT4,
         // .fs.images[0].name = "tex",
         // .fs.images[0].type = SG_IMAGETYPE_2D,
         .vs.source = parsh_get_blocks(shaders, "prefix terrain.vs"),
@@ -75,6 +96,9 @@ void app_init(App* app) {
         .depth_stencil.depth_write_enabled = false,
         .rasterizer.cull_mode = SG_CULLMODE_NONE,
         .layout.attrs[0].format = SG_VERTEXFORMAT_FLOAT4,
+        .layout.attrs[0].buffer_index = 0,
+        .layout.attrs[1].format = SG_VERTEXFORMAT_FLOAT2,
+        .layout.attrs[1].buffer_index = 1,
     });
 
     app->gfx.transition = (sg_pass_action){
@@ -83,7 +107,8 @@ void app_init(App* app) {
     };
 }
 
-void app_draw(App* app, double seconds) {
+void app_draw(App* app) {
+    const double seconds = stm_sec(stm_now());
     app_update_projection(app);
     if (app->transition.van_wijk) {
         const CameraTransition trans = app->transition;

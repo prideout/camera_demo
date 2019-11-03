@@ -13,7 +13,7 @@ out vec2 vuv;
 
 void main() {
   gl_Position = projection * modelview * position;
-  vnormal = (inverse_modelview * normal).xyz;
+  vnormal = (mat3(inverse_modelview) * normal).xyz;
   vuv = uv;
 }
 

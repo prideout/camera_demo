@@ -14,7 +14,7 @@
 struct GuiImpl {
     mu_Context ctx;
     mu_Container window;
-    mu_Container load_dialog;
+    mu_Container panel;
     App* app;
     sg_image atlas_img;
     sgl_pipeline pip;
@@ -22,9 +22,27 @@ struct GuiImpl {
     bool open_load_dialog;
 };
 
-const mu_Color kTooltipColor = {96, 128, 255, 255};
+const mu_Color kInfoTextColor = {96, 128, 255, 255};
 const mu_Color kActiveColor = {230, 230, 230, 255};
 const mu_Color kDisabledColor = {255, 255, 255, 100};
+const mu_Color kActiveButton = {75, 95, 115, 255};
+const mu_Color kNormalButton = {75, 75, 75, 255};
+const mu_Color kFocusButton = {115, 115, 115, 255};
+const mu_Color kHoverButton = {95, 95, 95, 255};
+
+static void disable(mu_Context* ctx) {
+    ctx->style->colors[MU_COLOR_TEXT] = kDisabledColor;
+    ctx->style->colors[MU_COLOR_BUTTONFOCUS] = kNormalButton;
+    ctx->style->colors[MU_COLOR_BUTTONHOVER] = kNormalButton;
+    ctx->style->colors[MU_COLOR_BUTTON] = kNormalButton;
+}
+
+static void enable(mu_Context* ctx) {
+    ctx->style->colors[MU_COLOR_TEXT] = kActiveColor;
+    ctx->style->colors[MU_COLOR_BUTTONFOCUS] = kFocusButton;
+    ctx->style->colors[MU_COLOR_BUTTONHOVER] = kHoverButton;
+    ctx->style->colors[MU_COLOR_BUTTON] = kNormalButton;
+}
 
 static void define_ui(Gui* gui) {
     mu_Context* ctx = &gui->ctx;
@@ -44,47 +62,53 @@ static void define_ui(Gui* gui) {
     const parcc_config config = parcc_get_config(app->camera_controller);
     parcc_config new_config = config;
 
-    mu_layout_row(ctx, 2, (int[]){-1, -1}, 0);
-    int orbit = config.mode == PARCC_ORBIT;
-    int map = config.mode == PARCC_MAP;
-    mu_checkbox(ctx, &orbit, "Orbit mode");
-    mu_checkbox(ctx, &map, "Map mode");
+    mu_layout_row(ctx, 2, (int[]){142, -1}, 0);
+    int orbit = mu_button(ctx, "Orbit mode");
+    ctx->style->colors[MU_COLOR_BUTTON] = kActiveButton;
+    int map = mu_button(ctx, "Map mode");
+    ctx->style->colors[MU_COLOR_BUTTON] = kNormalButton;
     new_config.mode = orbit ? PARCC_ORBIT : PARCC_MAP;
 
-    int show_fov = 1;
-    mu_header(ctx, &show_fov, "Field of view");
-    int vert = config.fov_direction == PARCC_VERTICAL;
-    int horiz = config.fov_direction == PARCC_HORIZONTAL;
-    mu_checkbox(ctx, &vert, "Vertical");
-    mu_checkbox(ctx, &horiz, "Horizontal");
+    int vert = mu_button(ctx, "Vertical FOV");
+    ctx->style->colors[MU_COLOR_BUTTON] = kActiveButton;
+    int horiz = mu_button(ctx, "Horizontal FOV");
+    ctx->style->colors[MU_COLOR_BUTTON] = kNormalButton;
     new_config.fov_direction = vert ? PARCC_VERTICAL : PARCC_HORIZONTAL;
 
-    mu_label(ctx, "Degrees");
-    float degrees = new_config.fov_radians * 180.0f / M_PI;
+    mu_layout_row(ctx, 2, (int[]){85, -1}, 0);
+    mu_label(ctx, "FOV Degrees");
+    static float degrees;
+    degrees = new_config.fov_radians * 180.0f / M_PI;
     mu_slider(ctx, &degrees, 10, 90);
     new_config.fov_radians = degrees * M_PI / 180.0f;
 
     mu_layout_row(ctx, 1, (int[]){-1}, 0);
+    static int raycast = 0;
+    mu_checkbox(ctx, &raycast, "Enable raycast for precise zoom / pan");
 
-    int raycast = 0;
-    mu_checkbox(ctx, &raycast, "Raycast");
+    mu_layout_row(ctx, 1, (int[]){-1}, -82);
+    mu_label(ctx, "");
 
-    mu_button(ctx, "Jump to Home Frame");
+    mu_layout_row(ctx, 1, (int[]){-1}, 0);
 
-    mu_layout_row(ctx, 3, (int[]){-1, -1, -1}, 0);
-    mu_button(ctx, "Save as Frame A");
-    mu_button(ctx, "Jump to Frame A");
-    mu_button(ctx, "Highlight Frame A");
+    mu_button(ctx, "Go to Home Frame");
 
-    mu_button(ctx, "Save as Frame B");
-    mu_button(ctx, "Jump to Frame B");
-    mu_button(ctx, "Highlight Frame B");
+    mu_layout_row(ctx, 3, (int[]){93, 93, 93}, 0);
+    mu_button(ctx, "Save Frame A");
+    disable(ctx);
+    mu_button(ctx, "Go to Frame A");
+    mu_button(ctx, "Show Frame A");
+    enable(ctx);
+
+    mu_button(ctx, "Save Frame B");
+    disable(ctx);
+    mu_button(ctx, "Go to Frame B");
+    mu_button(ctx, "Show Frame B");
+    enable(ctx);
 
     mu_end_window(ctx);
 
-    // if (config != new_config) {
-    //     parcc_set_config(app->camera_controller, new_config);
-    // }
+    parcc_set_config(app->camera_controller, new_config);
 
     mu_end(ctx);
 }
@@ -154,16 +178,6 @@ bool gui_handle(Gui* gui, const sapp_event* ev) {
             break;
         case SAPP_EVENTTYPE_CHAR: {
             char key = ev->char_code & 255;
-            if (gui->load_dialog.open) {
-                if (key != 127) {
-                    char txt[2] = {key, 0};
-                    mu_input_text(ctx, txt);
-                }
-                if (key == 27) {
-                    gui->load_dialog.open = 0;
-                }
-                break;
-            }
             if (key == 27) {
                 sapp_request_quit();
             }

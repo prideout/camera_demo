@@ -47,5 +47,6 @@ typedef struct App {
 } App;
 
 void app_init(App* app);
+void app_draw(App* app);
 void app_start_camera_transition(App* app);
 void app_update_projection(App* app);

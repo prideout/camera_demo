@@ -61,7 +61,7 @@ typedef struct {
 typedef struct parcc_context_s parcc_context;
 
 // Context and configuration functions.
-parcc_context* parsl_create_context(parcc_config config);
+parcc_context* parcc_create_context(parcc_config config);
 parcc_config parcc_get_config(const parcc_context* context);
 void parcc_set_config(parcc_context* context, parcc_config config);
 void parcc_destroy_context(parcc_context* ctx);
@@ -123,12 +123,36 @@ struct parcc_context_s {
 
 parcc_context* parcc_create_context(parcc_config config) {
     parcc_context* context = PAR_CALLOC(parcc_context, 1);
+    context->config = config;
     return context;
 }
 
-parcc_frame parcc_get_current_frame(const parcc_context* context) { return context->current_frame; }
+parcc_config parcc_get_config(const parcc_context* context) { return context->config; }
+
+void parcc_set_config(parcc_context* context, parcc_config config) { context->config = config; }
 
 void parsl_destroy_context(parcc_context* context) { PAR_FREE(context); }
+
+void parcc_grab_begin(parcc_context* context, parcc_float winx, parcc_float winy) {}
+
+void parcc_grab_update(parcc_context* context, parcc_float winx, parcc_float winy,
+                       parcc_float scrolldelta) {}
+
+void parcc_grab_end(parcc_context* context) {}
+
+parcc_frame parcc_get_current_frame(const parcc_context* context) { return context->current_frame; }
+
+parcc_frame parcc_get_home_frame(const parcc_context* context, parcc_float margin) {
+    return (parcc_frame){0};
+}
+
+void parcc_set_frame(parcc_context* context, parcc_frame frame) { context->current_frame = frame; }
+
+parcc_frame parcc_interpolate_frames(parcc_frame a, parcc_frame b, double t) {
+    return (parcc_frame){0};
+}
+
+double parcc_get_interpolation_duration(parcc_frame a, parcc_frame b) { return 1.0; }
 
 #endif  // PAR_CAMERA_CONTROL_IMPLEMENTATION
 #endif  // PAR_CAMERA_CONTROL_H

@@ -25,25 +25,6 @@ typedef struct {
     float x, y;
 } vec2;
 
-static vec4 positions[] = {
-    {0, 0, 0, 1},  // 0
-    {1, 0, 0, 1},  // 1
-    {1, 1, 0, 1},  // 2
-    {0, 1, 0, 1},  // 3
-};
-
-static const vec2 texcoords[] = {
-    {0, 1},  // 0
-    {1, 1},  // 1
-    {1, 0},  // 2
-    {0, 0},  // 3
-};
-
-static const uint16_t indices[] = {
-    0, 1, 2,  //
-    2, 3, 0,  //
-};
-
 void app_update_projection(App* app) {
     const float vpwidth = sapp_width() - kSidebarWidth;
     const float vpheight = sapp_height();
@@ -59,28 +40,61 @@ static void create_mesh(App* app, const char* filename) {
     assert(u8_data);
     float* float_data = malloc(sizeof(float) * width * height);
     for (int i = 0; i < width * height; i++) {
-        float_data[i] = (float)u8_data[i] / 255.0f;
+        float_data[i] = u8_data[i];
     }
     stbi_image_free(u8_data);
 
     const int cellsize = 10;
 
-    const float thresholds[5] = {
-        .15f, .30f, .45f, .60f, .75f,
-    };
+    static const int nthresholds = 5;
+    float thresholds[5] = {20, 40, 60, 80, 100};
+
+    // par_msquares_meshlist* meshes = par_msquares_grayscale_multi(
+    //     float_data, width, height, cellsize, thresholds, nthresholds, PAR_MSQUARES_HEIGHTS);
 
     par_msquares_meshlist* meshes =
-        par_msquares_grayscale_multi(float_data, width, height, cellsize, thresholds, 5,
-                                     PAR_MSQUARES_SIMPLIFY | PAR_MSQUARES_HEIGHTS);
+        par_msquares_grayscale(float_data, width, height, cellsize, 128, PAR_MSQUARES_HEIGHTS);
 
     assert(meshes);
-
-    int num_meshes = par_msquares_get_count(meshes);
-    printf("%d meshes\n", num_meshes);
 
     par_msquares_mesh const* mesh = par_msquares_get_mesh(meshes, 0);
     printf("mesh 0 : %d verts, %d triangles (dim = %d)\n", mesh->npoints, mesh->ntriangles,
            mesh->dim);
+
+    app->min_corner[0] = 5000;
+    app->max_corner[0] = -5000;
+    app->min_corner[1] = 5000;
+    app->max_corner[1] = -5000;
+    app->min_corner[2] = 0;
+    app->max_corner[2] = 0;
+
+    for (int i = 0; i < mesh->npoints; i += 3) {
+        app->min_corner[0] = fmin(app->min_corner[0], mesh->points[i]);
+        app->max_corner[0] = fmax(app->max_corner[0], mesh->points[i]);
+        app->min_corner[1] = fmin(app->min_corner[1], mesh->points[i + 1]);
+        app->max_corner[1] = fmax(app->max_corner[1], mesh->points[i + 1]);
+    }
+
+    sg_buffer positions_buffer = sg_make_buffer(&(sg_buffer_desc){
+        .size = sizeof(float) * mesh->dim * mesh->npoints,
+        .usage = SG_USAGE_IMMUTABLE,
+        .content = mesh->points,
+    });
+
+    sg_buffer index_buffer = sg_make_buffer(&(sg_buffer_desc){
+        .size = sizeof(uint16_t) * mesh->ntriangles * 3,
+        .usage = SG_USAGE_IMMUTABLE,
+        .content = mesh->triangles,
+        .type = SG_BUFFERTYPE_INDEXBUFFER,
+    });
+
+    app->gfx.bindings = (sg_bindings){
+        .vertex_buffers[0] = positions_buffer,
+        .fs_images[0] = app->gfx.texture,
+        .index_buffer = index_buffer,
+    };
+
+    app->gfx.num_elements = mesh->ntriangles * 3;
 
     par_msquares_free(meshes);
     free(float_data);
@@ -150,20 +164,21 @@ void app_init(App* app) {
     create_mesh(app, "extras/terrain/elevation.png");
     printf("Created mesh in %.0f ms\n", stm_ms(stm_diff(stm_now(), start_mesh)));
 
-    positions[1].x = positions[2].x = width;
-    positions[2].y = positions[3].y = height;
-
     app->camera = camera_create();
 
     app_update_projection(app);
+
+    const float cx = 0.5f * (app->min_corner[0] + app->max_corner[0]);
+    const float cy = 0.5f * (app->min_corner[1] + app->max_corner[1]);
+    printf("Center: %g %g\n", cx, cy);
 
     const float vpwidth = sapp_width() - kSidebarWidth;
     const float vpheight = sapp_height();
     const float fovy = camera_get_fovy_radians(app->camera);
     const float fovx = fovy * vpwidth / vpheight;
-    const float kInitialDistance = width / tanf(fovx);
-    const float eyepos[] = {width / 2.0f, height / 2.0f, kInitialDistance};
-    const float target[] = {width / 2.0f, height / 2.0f, 0};
+    const float kInitialDistance = 1.0 / tanf(fovx);
+    const float eyepos[] = {cx, cy, kInitialDistance};
+    const float target[] = {cx, cy, 0};
     const float upward[] = {0, 1, 0};
     camera_look_atf(app->camera, eyepos, target, upward);
     printf("Distance is %f\n", kInitialDistance);
@@ -182,34 +197,6 @@ void app_init(App* app) {
 
     parsh_context* shaders = parsh_create_context_from_file("src/demo.glsl");
     parsh_add_block(shaders, "prefix", "#version 330\n");
-
-    sg_buffer positions_buffer = sg_make_buffer(&(sg_buffer_desc){
-        .size = sizeof(positions),
-        .usage = SG_USAGE_IMMUTABLE,
-        .content = positions,
-    });
-
-    sg_buffer texcoords_buffer = sg_make_buffer(&(sg_buffer_desc){
-        .size = sizeof(texcoords),
-        .usage = SG_USAGE_IMMUTABLE,
-        .content = texcoords,
-    });
-
-    sg_buffer index_buffer = sg_make_buffer(&(sg_buffer_desc){
-        .size = sizeof(indices),
-        .usage = SG_USAGE_IMMUTABLE,
-        .content = indices,
-        .type = SG_BUFFERTYPE_INDEXBUFFER,
-    });
-
-    app->gfx.num_elements = 6;
-
-    app->gfx.bindings = (sg_bindings){
-        .vertex_buffers[0] = positions_buffer,  //
-        .vertex_buffers[1] = texcoords_buffer,
-        .fs_images[0] = app->gfx.texture,
-        .index_buffer = index_buffer,
-    };
 
     sg_shader program = sg_make_shader(&(sg_shader_desc){
         .vs.uniform_blocks[0].size = sizeof(Uniforms),
@@ -231,10 +218,10 @@ void app_init(App* app) {
         .depth_stencil.depth_write_enabled = false,
         .rasterizer.cull_mode = SG_CULLMODE_NONE,
         .index_type = SG_INDEXTYPE_UINT16,
-        .layout.attrs[0].format = SG_VERTEXFORMAT_FLOAT4,
+        .layout.attrs[0].format = SG_VERTEXFORMAT_FLOAT3,
         .layout.attrs[0].buffer_index = 0,
-        .layout.attrs[1].format = SG_VERTEXFORMAT_FLOAT2,
-        .layout.attrs[1].buffer_index = 1,
+        // .layout.attrs[1].format = SG_VERTEXFORMAT_FLOAT2,
+        // .layout.attrs[1].buffer_index = 1,
     });
 }
 

@@ -10,7 +10,7 @@
 #define kSidebarWidth (300)
 #define kFov (33)
 #define kNearPlane (1)
-#define kFarPlane (10000)
+#define kFarPlane (1000)
 
 typedef enum { VISUAL_MODE_2D, VISUAL_MODE_3D } VisualMode;
 
@@ -43,6 +43,8 @@ typedef struct App {
     parcc_context* camera_controller;
     GraphicsState gfx;
     Gui* gui;
+    float min_corner[3];
+    float max_corner[3];
 } App;
 
 void app_init(App* app);

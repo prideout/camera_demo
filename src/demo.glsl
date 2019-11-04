@@ -1,8 +1,7 @@
 -- terrain.vs
 
 layout(location=0) in vec4 position;
-layout(location=1) in vec2 uv;
-layout(location=2) in vec3 normal;
+layout(location=1) in vec3 normal;
 
 uniform mat4 modelview;
 uniform mat4 inverse_modelview;
@@ -12,9 +11,9 @@ out vec3 vnormal;
 out vec2 vuv;
 
 void main() {
-  gl_Position = projection * modelview * position;
+  gl_Position = projection * modelview * vec4(position.xy, 0.0, 1);
   vnormal = (mat3(inverse_modelview) * normal).xyz;
-  vuv = uv;
+  vuv = position.xy * vec2(1.0, 3.0);
 }
 
 -- terrain.fs

@@ -542,8 +542,8 @@ void par_msquares_free(par_msquares_meshlist* mlist)
     free(mlist);
 }
 
-// Combine multiple meshlists by moving mesh pointers, and optionally apply
-// a "snap" operation that assigns a single Z value across all verts in each
+// Combine multiple meshlists by moving mesh pointers, and optionally applying
+// a snap operation that assigns a single Z value across all verts in each
 // mesh.  The Z value determined by the mesh's position in the final mesh list.
 static par_msquares_meshlist* par_msquares__merge(par_msquares_meshlist** lists,
     int count, int snap)

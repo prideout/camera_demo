@@ -40,40 +40,44 @@ static void create_mesh(App* app, const char* filename) {
     assert(u8_data);
     float* float_data = malloc(sizeof(float) * width * height);
     for (int i = 0; i < width * height; i++) {
-        float_data[i] = u8_data[i];
+        float_data[i] = (255 - u8_data[i]);
     }
     stbi_image_free(u8_data);
 
     const int cellsize = 10;
 
     static const int nthresholds = 5;
-    float thresholds[5] = {20, 40, 60, 80, 100};
+    float thresholds[5] = {128, 154, 180, 206, 232};
 
-    // par_msquares_meshlist* meshes = par_msquares_grayscale_multi(
-    //     float_data, width, height, cellsize, thresholds, nthresholds, PAR_MSQUARES_HEIGHTS);
-
-    par_msquares_meshlist* meshes =
-        par_msquares_grayscale(float_data, width, height, cellsize, 128, PAR_MSQUARES_HEIGHTS);
+    par_msquares_meshlist* meshes = par_msquares_grayscale_multi(
+        float_data, width, height, cellsize, thresholds, nthresholds, PAR_MSQUARES_HEIGHTS);
 
     assert(meshes);
 
+    int nmeshes = par_msquares_get_count(meshes);
+
     par_msquares_mesh const* mesh = par_msquares_get_mesh(meshes, 0);
-    printf("mesh 0 : %d verts, %d triangles (dim = %d)\n", mesh->npoints, mesh->ntriangles,
-           mesh->dim);
+    printf("mesh 0 of %d : %d verts, %d triangles (dim = %d)\n", nmeshes, mesh->npoints,
+           mesh->ntriangles, mesh->dim);
 
     app->min_corner[0] = 5000;
     app->max_corner[0] = -5000;
     app->min_corner[1] = 5000;
     app->max_corner[1] = -5000;
-    app->min_corner[2] = 0;
-    app->max_corner[2] = 0;
+    app->min_corner[2] = 5000;
+    app->max_corner[2] = -5000;
 
     for (int i = 0; i < mesh->npoints; i += 3) {
         app->min_corner[0] = fmin(app->min_corner[0], mesh->points[i]);
         app->max_corner[0] = fmax(app->max_corner[0], mesh->points[i]);
         app->min_corner[1] = fmin(app->min_corner[1], mesh->points[i + 1]);
         app->max_corner[1] = fmax(app->max_corner[1], mesh->points[i + 1]);
+        app->min_corner[2] = fmin(app->min_corner[2], mesh->points[i + 2]);
+        app->max_corner[2] = fmax(app->max_corner[2], mesh->points[i + 2]);
     }
+
+    printf("min corner %g %g %g\n", app->min_corner[0], app->min_corner[1], app->min_corner[2]);
+    printf("max corner %g %g %g\n", app->max_corner[0], app->max_corner[1], app->max_corner[2]);
 
     sg_buffer positions_buffer = sg_make_buffer(&(sg_buffer_desc){
         .size = sizeof(float) * mesh->dim * mesh->npoints,

@@ -1,6 +1,8 @@
 // MSQUARES :: https://github.com/prideout/par
 // Converts fp32 grayscale images, or 8-bit color images, into triangles.
 //
+// THIS IS EXPERIMENTAL CODE, DO NOT USE IN PRODUCTION
+//
 // For grayscale images, a threshold is specified to determine insideness.
 // For color images, an exact color is specified to determine insideness.
 // Color images can be r8, rg16, rgb24, or rgba32. For a visual overview of
@@ -891,7 +893,11 @@ par_msquares_meshlist* par_msquares_function(int width, int height,
                 }
 
                 if (mesh->dim == 3) {
-                    ppts[2] = heightfn(ppts[0], ppts[1], context);
+                    if (width > height) {
+                        ppts[2] = heightfn(ppts[0], ppts[1] * width / height, context);
+                    } else {
+                        ppts[2] = heightfn(ppts[0] * height / width, ppts[1], context);
+                    }
                 }
 
                 ppts += mesh->dim;

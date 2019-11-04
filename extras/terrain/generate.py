@@ -51,18 +51,20 @@ print("Computing the distance field.")
 elevation = snowy.generate_sdf(mask)
 elevation /= np.amax(elevation)
 
-print("Quantizing.")
-bins = np.arange(-1.0, 1.0, 0.2)
-elevation = -1.0 + 2.0 * np.float64(np.digitize(elevation, bins)) / len(bins)
-elevation = np.where(elevation < 0, 0, elevation)
-snowy.save(elevation, "elevation.exr")
-
 print("Computing ambient occlusion.")
 occlusion = snowy.compute_skylight(elevation)
 occlusion = 0.25 + 0.75 * occlusion
 
 print("Generating normal map.")
 normals = snowy.resize(snowy.compute_normals(elevation), width, height)
+
+# Save the landmass portion of the elevation data.
+landmass = elevation * np.where(elevation < 0.0, 0.0, 1.0)
+snowy.save(landmass, "landmass.png")
+
+# Flatten the normals according to landmass versus sea.
+normals += np.float64([0, 0, 1000]) * np.where(elevation < 0.0, 1.0, 0.01)
+normals /= snowy.reshape(np.sqrt(np.sum(normals * normals, 2)))
 
 print("Applying diffuse lighting.")
 lightdir = np.float64([0.5, -0.5, 1])

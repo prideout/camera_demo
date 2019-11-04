@@ -38,21 +38,20 @@ static void create_mesh(App* app, const char* filename) {
     int width, height;
     stbi_uc* u8_data = stbi_load(filename, &width, &height, &nchan, 1);
     assert(u8_data);
+    printf("%s :: width = %d, height = %d\n", filename, width, height);
     float* float_data = malloc(sizeof(float) * width * height);
     for (int i = 0; i < width * height; i++) {
-        float_data[i] = (255 - u8_data[i]);
+        // float_data[i] = (255 - u8_data[i]) / 255.0f;
+        float_data[i] = (float)u8_data[i] / 255.0f;
     }
     stbi_image_free(u8_data);
 
-    const int cellsize = 10;
-
-    static const int nthresholds = 5;
-    float thresholds[5] = {128, 154, 180, 206, 232};
-
-    par_msquares_meshlist* meshes = par_msquares_grayscale_multi(
-        float_data, width, height, cellsize, thresholds, nthresholds, PAR_MSQUARES_HEIGHTS);
+    const int cellsize = 5;
+    par_msquares_meshlist* meshes =
+        par_msquares_grayscale(float_data, width, height, cellsize, 0.0f, PAR_MSQUARES_HEIGHTS);
 
     assert(meshes);
+    free(float_data);
 
     int nmeshes = par_msquares_get_count(meshes);
 
@@ -67,12 +66,13 @@ static void create_mesh(App* app, const char* filename) {
     app->min_corner[2] = 5000;
     app->max_corner[2] = -5000;
 
-    for (int i = 0; i < mesh->npoints; i += 3) {
+    for (int i = 0; i < mesh->npoints * 3; i += 3) {
         app->min_corner[0] = fmin(app->min_corner[0], mesh->points[i]);
-        app->max_corner[0] = fmax(app->max_corner[0], mesh->points[i]);
         app->min_corner[1] = fmin(app->min_corner[1], mesh->points[i + 1]);
-        app->max_corner[1] = fmax(app->max_corner[1], mesh->points[i + 1]);
         app->min_corner[2] = fmin(app->min_corner[2], mesh->points[i + 2]);
+
+        app->max_corner[0] = fmax(app->max_corner[0], mesh->points[i]);
+        app->max_corner[1] = fmax(app->max_corner[1], mesh->points[i + 1]);
         app->max_corner[2] = fmax(app->max_corner[2], mesh->points[i + 2]);
     }
 
@@ -101,7 +101,6 @@ static void create_mesh(App* app, const char* filename) {
     app->gfx.num_elements = mesh->ntriangles * 3;
 
     par_msquares_free(meshes);
-    free(float_data);
 }
 
 static void create_texture(App* app, const char* filename, int* width, int* height) {
@@ -165,7 +164,7 @@ void app_init(App* app) {
            stm_ms(stm_diff(stm_now(), start_decode)));
 
     const uint64_t start_mesh = stm_now();
-    create_mesh(app, "extras/terrain/elevation.png");
+    create_mesh(app, "extras/terrain/landmass.png");
     printf("Created mesh in %.0f ms\n", stm_ms(stm_diff(stm_now(), start_mesh)));
 
     app->camera = camera_create();
@@ -219,13 +218,12 @@ void app_init(App* app) {
     app->gfx.pipeline = sg_make_pipeline(&(sg_pipeline_desc){
         .shader = program,
         .blend.enabled = false,
-        .depth_stencil.depth_write_enabled = false,
+        .depth_stencil.depth_compare_func = SG_COMPAREFUNC_LESS,
+        .depth_stencil.depth_write_enabled = true,
         .rasterizer.cull_mode = SG_CULLMODE_NONE,
         .index_type = SG_INDEXTYPE_UINT16,
         .layout.attrs[0].format = SG_VERTEXFORMAT_FLOAT3,
         .layout.attrs[0].buffer_index = 0,
-        // .layout.attrs[1].format = SG_VERTEXFORMAT_FLOAT2,
-        // .layout.attrs[1].buffer_index = 1,
     });
 }
 
@@ -259,6 +257,8 @@ void app_draw(App* app) {
     const sg_pass_action pass_action = {
         .colors[0].action = SG_ACTION_CLEAR,
         .colors[0].val = {0.1f, 0.2f, 0.3f, 1.0f},
+        .depth.action = SG_ACTION_CLEAR,
+        .depth.val = 1.0f,
     };
 
     const float vp_width = sapp_width() - kSidebarWidth;

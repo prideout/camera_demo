@@ -1,19 +1,42 @@
 // CAMERA CONTROL :: https://prideout.net/blog/par_camera_control/
-// Enables orbit controls (a.k.a. tumble, trackball) or pan-and-zoom like Google Maps.
+// Enables orbit controls (a.k.a. tumble, arcball, trackball) or pan-and-zoom like Google Maps.
 //
-// Usage example:
+// This simple library is designed around the idea of a camera orbiting (or panning) around (or
+// over) a 3D object or swath of terrain, and that users would like to control their viewing
+// location by grabbing and dragging locations in the scene. It makes no assumptions about
+// your renderer or platform. In a sense, this is just a math library.
+//
+// If desired, clients could also use this library to help with "spin the object" functionality
+// rather than "orbit the camera", but the latter is what we've designed it for.
+//
+// The library takes a raycast callback in order to support precise grabbing behavior. If this is
+// not necessary for your use case (e.g. a top-down terrain with an orthgraphic projection), simply
+// provide a plane intersection function, as shown below.
 //
 //   #define PAR_CAMERA_CONTROL_IMPLEMENTATION
 //   #include "par_camera_control.h"
 //
-//   parcc_context* controller = parc_create_context();
-//   TODO
+//   static bool raycast(float origin[3], float dir[3], float* t, void* userdata) {
+//      ... intersect with ground plane at z = 0
+//   }
+//
+//   parcc_context* controller = parc_create_context((parcc_config) {
+//      ...
+//   });
+//
+//  while (game_loop_is_alive) {
+//      bool dirty = parcc_tick(controller, get_time_seconds());
+//      if (dirty) { ... }
+//   }
+//   ....
 //   parcc_destroy_context(controller);
 //
 // Distributed under the MIT License, see bottom of file.
 
 #ifndef PAR_CAMERA_CONTROL_H
 #define PAR_CAMERA_CONTROL_H
+
+#include <stdbool.h>
 
 #ifdef __cplusplus
 extern "C" {
@@ -46,15 +69,16 @@ typedef struct {
     parcc_float max_corner[3];
 } parcc_aabb;
 
+typedef bool (*parcc_raycast_fn)(float origin[3], float dir[3], float* t, void* userdata);
+
 typedef struct {
     parcc_mode mode;
-    // TODO: Callbacks (and userdata) for camera manip... or queries?
-    // TODO: Optional callbacks (and userdata) for raycast
     int viewport_width;
     int viewport_height;
     parcc_fov fov_direction;
     parcc_float fov_radians;
     parcc_aabb content_aabb;
+    parcc_raycast_fn raycast;
 } parcc_config;
 
 // Opaque handle to a camera controller and its memory arena.
@@ -65,6 +89,17 @@ parcc_context* parcc_create_context(parcc_config config);
 parcc_config parcc_get_config(const parcc_context* context);
 void parcc_set_config(parcc_context* context, parcc_config config);
 void parcc_destroy_context(parcc_context* ctx);
+
+// The "tick" function takes the current time (expressed in seconds), computes the current look-at
+// vectors and camera matrices, advances animation, and returns true if the camera has been dirtied
+// since the previous tick.
+bool parcc_tick(parcc_context* ctx, double time);
+
+// Camera retrieval functions.
+void parcc_get_look_at(const parcc_context* ctx, parcc_float eyepos[3], parcc_float target[3],
+                       parcc_float upward[3]);
+void parcc_get_matrix_projection(const parcc_context* ctx, parcc_float projection[16]);
+void parcc_get_matrix_view(const parcc_context* ctx, parcc_float view[16]);
 
 // Window functions, which are useful for user interaction.
 // Window coordinates are normalized into [0, +1] where (0, 0) is the top left.

@@ -33,8 +33,8 @@ add_executable(${NAME} ${SRCS})
 target_include_directories(${NAME} PRIVATE "extras")
 
 # Uncomment the following lines to enable address sanitizer.
-set(ASAN_CFLAGS -fsanitize=undefined -fsanitize=address -fstack-protector)
-set(ASAN_LINKFLAGS ${ASAN_CFLAGS} -lstdc++)
+#set(ASAN_CFLAGS -fsanitize=undefined -fsanitize=address -fstack-protector)
+#set(ASAN_LINKFLAGS ${ASAN_CFLAGS} -lstdc++)
 
 target_compile_options(${NAME} PRIVATE -fobjc-arc -Wpedantic ${ASAN_CFLAGS})
 target_link_options(${NAME} PRIVATE ${ASAN_LINKFLAGS})

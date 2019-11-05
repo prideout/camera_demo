@@ -3,15 +3,19 @@
 //
 // THIS IS EXPERIMENTAL CODE, DO NOT USE IN PRODUCTION
 //
+// Note that a potentially more interesting project for converting bitmaps
+// into vectors can be found at https://github.com/BlockoS/blob, which is an
+// implementation of "A linear-time component-labeling algorithm using contour
+// tracing technique" by Fu Chang, Chun-Jen Chen, and Chi-Jen Lu. I recommend
+// using that in combination with a simple ear-clipping algorithm for triangle
+// tessellation. (see https://prideout.net/polygon.js)
+//
 // For grayscale images, a threshold is specified to determine insideness.
 // For color images, an exact color is specified to determine insideness.
 // Color images can be r8, rg16, rgb24, or rgba32. For a visual overview of
 // the API and all the flags, see:
 //
 //     https://prideout.net/marching-squares
-//
-// Another interesting project for converting bitmaps into vectors can be found
-// at https://github.com/BlockoS/blob.
 //
 // Distributed under the MIT License, see bottom of file.
 
@@ -894,9 +898,11 @@ par_msquares_meshlist* par_msquares_function(int width, int height,
 
                 if (mesh->dim == 3) {
                     if (width > height) {
-                        ppts[2] = heightfn(ppts[0], ppts[1] * width / height, context);
+                        ppts[2] = heightfn(ppts[0], ppts[1] * width / height,
+                            context);
                     } else {
-                        ppts[2] = heightfn(ppts[0] * height / width, ppts[1], context);
+                        ppts[2] = heightfn(ppts[0] * height / width, ppts[1],
+                            context);
                     }
                 }
 

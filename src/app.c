@@ -25,14 +25,6 @@ typedef struct {
     float x, y;
 } vec2;
 
-void app_update_projection(App* app) {
-    const float vpwidth = sapp_width() - kSidebarWidth;
-    const float vpheight = sapp_height();
-    camera_set_aspect(app->camera, vpwidth / vpheight);
-    camera_perspective(app->camera, CAMERA_FOV_HORIZONTAL, kFov, kNearPlane, kFarPlane);
-    camera_get_projection_matrixf(app->camera, app->gfx.uniforms.projection);
-}
-
 static void create_mesh(App* app, const char* filename) {
     int nchan;
     int width, height;
@@ -41,7 +33,6 @@ static void create_mesh(App* app, const char* filename) {
     printf("%s :: width = %d, height = %d\n", filename, width, height);
     float* float_data = malloc(sizeof(float) * width * height);
     for (int i = 0; i < width * height; i++) {
-        // float_data[i] = (255 - u8_data[i]) / 255.0f;
         float_data[i] = (float)u8_data[i] / 255.0f;
     }
     stbi_image_free(u8_data);
@@ -167,34 +158,18 @@ void app_init(App* app) {
     create_mesh(app, "extras/terrain/landmass.png");
     printf("Created mesh in %.0f ms\n", stm_ms(stm_diff(stm_now(), start_mesh)));
 
-    app->camera = camera_create();
-
-    app_update_projection(app);
-
-    const float cx = 0.5f * (app->min_corner[0] + app->max_corner[0]);
-    const float cy = 0.5f * (app->min_corner[1] + app->max_corner[1]);
-    printf("Center: %g %g\n", cx, cy);
-
-    const float vpwidth = sapp_width() - kSidebarWidth;
-    const float vpheight = sapp_height();
-    const float fovy = camera_get_fovy_radians(app->camera);
-    const float fovx = fovy * vpwidth / vpheight;
-    const float kInitialDistance = 1.0 / tanf(fovx);
-    const float eyepos[] = {cx, cy, kInitialDistance};
-    const float target[] = {cx, cy, 0};
-    const float upward[] = {0, 1, 0};
-    camera_look_atf(app->camera, eyepos, target, upward);
-    printf("Distance is %f\n", kInitialDistance);
-
-    app->camera_controller = parcc_create_context((parcc_config){
+    parcc_config config = {
         .mode = PARCC_ORBIT,
-        .viewport_width = 100,
-        .viewport_height = 100,
+        .viewport_width = sapp_width() - kSidebarWidth,
+        .viewport_height = sapp_height(),
+        .near_plane = kNearPlane,
+        .far_plane = kFarPlane,
         .fov_direction = PARCC_HORIZONTAL,
-        .fov_radians = M_PI / 3,
-        .content_aabb.min_corner = {0, 0, 0},
-        .content_aabb.max_corner = {0, 0, 0},
-    });
+        .fov_degrees = kFov,
+    };
+    float3_copy(config.content_aabb.min_corner, app->min_corner);
+    float3_copy(config.content_aabb.max_corner, app->max_corner);
+    app->camera_controller = parcc_create_context(config);
 
     app->gui = gui_create(app, kSidebarWidth);
 
@@ -229,7 +204,9 @@ void app_init(App* app) {
 
 void app_draw(App* app) {
     const double seconds = stm_sec(stm_now());
-    app_update_projection(app);
+
+    parcc_tick(app->camera_controller, seconds);
+    parcc_get_matrix_projection(app->camera_controller, app->gfx.uniforms.projection);
 
     if (app->transition.van_wijk) {
         const CameraTransition trans = app->transition;
@@ -245,7 +222,7 @@ void app_draw(App* app) {
     }
 
     float view[16];
-    camera_get_view_matrixf(app->camera, view);
+    parcc_get_matrix_view(app->camera_controller, view);
 
     float model[16];
     float16_identity(model);

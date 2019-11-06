@@ -14,6 +14,13 @@ static void handler(const sapp_event* event) {
     const float winx = (event->mouse_x - kSidebarWidth) / vpwidth;
     const float winy = 1.0 - event->mouse_y / vpheight;
     switch (event->type) {
+        case SAPP_EVENTTYPE_RESIZED: {
+            parcc_config config = parcc_get_config(app.camera_controller);
+            config.viewport_width = vpwidth;
+            config.viewport_height = vpheight;
+            parcc_set_config(app.camera_controller, config);
+            break;
+        }
         case SAPP_EVENTTYPE_MOUSE_DOWN: {
             mouse_down_pos[0] = winx;
             mouse_down_pos[1] = winy;

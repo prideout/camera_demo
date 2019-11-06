@@ -4,6 +4,5 @@ Easy to build on macOS. First make sure you have CMake and clang installed, then
 
 # TODO
 
-- hook up "controller" with "camera"
-- enable the Fov slider and Horiz / Vert buttons
-- touch points
+- enable the Horiz / Vert buttons
+- multi-touch to zoom

@@ -18,8 +18,6 @@ set(SRCS
         src/gui.h
         src/gui.c
         src/platform.m
-        src/camera.c
-        src/camera.h
         src/ray_float.c
         src/ray_float.h
         src/demo.c

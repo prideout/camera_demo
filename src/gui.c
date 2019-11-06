@@ -78,9 +78,9 @@ static void define_ui(Gui* gui) {
     mu_layout_row(ctx, 2, (int[]){85, -1}, 0);
     mu_label(ctx, "FOV Degrees");
     static float degrees;
-    degrees = new_config.fov_radians * 180.0f / M_PI;
+    degrees = new_config.fov_degrees;
     mu_slider(ctx, &degrees, 10, 90);
-    new_config.fov_radians = degrees * M_PI / 180.0f;
+    new_config.fov_degrees = degrees;
 
     mu_layout_row(ctx, 1, (int[]){-1}, 0);
     static int raycast = 0;

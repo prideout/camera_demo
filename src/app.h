@@ -39,7 +39,6 @@ typedef struct {
 typedef struct App {
     VisualMode visual_mode;
     CameraTransition transition;
-    Camera* camera;
     parcc_context* camera_controller;
     GraphicsState gfx;
     Gui* gui;

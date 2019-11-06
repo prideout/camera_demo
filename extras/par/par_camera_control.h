@@ -1,10 +1,10 @@
 // CAMERA CONTROL :: https://prideout.net/blog/par_camera_control/
 // Enables orbit controls (a.k.a. tumble, arcball, trackball) or pan-and-zoom like Google Maps.
 //
-// This simple library is designed around the idea of a camera orbiting (or panning) around (or
+// This simple library is designed to support the idea of a camera orbiting (or panning) around (or
 // over) a 3D object or swath of terrain, and that users would like to control their viewing
-// location by grabbing and dragging locations in the scene. It makes no assumptions about
-// your renderer or platform. In a sense, this is just a math library.
+// location by grabbing and dragging locations in the scene. It makes no assumptions about your
+// renderer or platform. In a sense, this is just a math library.
 //
 // If desired, clients could also use this library to help with "spin the object" functionality
 // rather than "orbit the camera", but the latter is what we've designed it for.
@@ -75,8 +75,10 @@ typedef struct {
     parcc_mode mode;
     int viewport_width;
     int viewport_height;
+    parcc_float near_plane;
+    parcc_float far_plane;
     parcc_fov fov_direction;
-    parcc_float fov_radians;
+    parcc_float fov_degrees;
     parcc_aabb content_aabb;
     parcc_raycast_fn raycast;
 } parcc_config;
@@ -95,7 +97,7 @@ void parcc_destroy_context(parcc_context* ctx);
 // since the previous tick.
 bool parcc_tick(parcc_context* ctx, double time);
 
-// Camera retrieval functions.
+// Camera retrieval functions. This be called only after calling tick() at least once.
 void parcc_get_look_at(const parcc_context* ctx, parcc_float eyepos[3], parcc_float target[3],
                        parcc_float upward[3]);
 void parcc_get_matrix_projection(const parcc_context* ctx, parcc_float projection[16]);
@@ -125,10 +127,11 @@ double parcc_get_interpolation_duration(parcc_frame a, parcc_frame b);
 #ifdef PAR_CAMERA_CONTROL_IMPLEMENTATION
 
 #include <assert.h>
-#include <limits.h>
 #include <math.h>
 #include <memory.h>
 #include <stdlib.h>
+
+#include "../../src/vec_float.h"  // TODO: integrate
 
 #ifndef PAR_PI
 #define PAR_PI (3.14159265359)
@@ -154,11 +157,21 @@ double parcc_get_interpolation_duration(parcc_frame a, parcc_frame b);
 struct parcc_context_s {
     parcc_config config;
     parcc_frame current_frame;
+    parcc_float projection[16];
+    parcc_float viewmatrix[16];
+    parcc_float eyepos[3];
+    parcc_float target[3];
+    parcc_float upward[3];
 };
 
 parcc_context* parcc_create_context(parcc_config config) {
     parcc_context* context = PAR_CALLOC(parcc_context, 1);
     context->config = config;
+    parcc_float center[3];
+    float3_lerp(center, config.content_aabb.min_corner, config.content_aabb.max_corner, 0.5);
+    float3_set(context->eyepos, center[0], center[1], 2);  // TODO: compute initial distance
+    float3_set(context->target, center[0], center[1], 0);
+    float3_set(context->upward, 0, 1, 0);
     return context;
 }
 
@@ -166,7 +179,35 @@ parcc_config parcc_get_config(const parcc_context* context) { return context->co
 
 void parcc_set_config(parcc_context* context, parcc_config config) { context->config = config; }
 
-void parsl_destroy_context(parcc_context* context) { PAR_FREE(context); }
+void parcc_destroy_context(parcc_context* context) { PAR_FREE(context); }
+
+bool parcc_tick(parcc_context* context, double seconds) {
+    float16_look_at(context->viewmatrix, context->eyepos, context->target, context->upward);
+    const parcc_config cfg = context->config;
+    const parcc_float aspect = (parcc_float)cfg.viewport_width / cfg.viewport_height;
+    const parcc_float fov = cfg.fov_degrees;
+    if (context->config.fov_direction == PARCC_HORIZONTAL) {
+        float16_perspective_x(context->projection, fov, aspect, cfg.near_plane, cfg.far_plane);
+    } else {
+        float16_perspective_y(context->projection, fov, aspect, cfg.near_plane, cfg.far_plane);
+    }
+    return true;  // TODO: dirty flag
+}
+
+void parcc_get_look_at(const parcc_context* ctx, parcc_float eyepos[3], parcc_float target[3],
+                       parcc_float upward[3]) {
+    float3_copy(eyepos, ctx->eyepos);
+    float3_copy(target, ctx->target);
+    float3_copy(upward, ctx->upward);
+}
+
+void parcc_get_matrix_projection(const parcc_context* ctx, parcc_float projection[16]) {
+    float16_copy(projection, ctx->projection);
+}
+
+void parcc_get_matrix_view(const parcc_context* ctx, parcc_float view[16]) {
+    float16_copy(view, ctx->viewmatrix);
+}
 
 void parcc_grab_begin(parcc_context* context, parcc_float winx, parcc_float winy) {}
 

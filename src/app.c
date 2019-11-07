@@ -2,6 +2,8 @@
 #include <math.h>
 #include <stdio.h>
 
+#include <nanort/nanort_c.h>
+
 #include <par/par_camera_control.h>
 #include <par/par_msquares.h>
 #include <par/par_shaders.h>

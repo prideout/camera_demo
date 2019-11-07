@@ -11,6 +11,8 @@ endif()
 add_definitions(-DTVECTOR_STDIO)
 
 set(SRCS
+        extras/nanort/nanort.cc
+        extras/nanort/nanort.h
         extras/microui/microui.c
         extras/microui/microui.h
         src/app.h

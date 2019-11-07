@@ -19,7 +19,7 @@ set(SRCS
         src/app.c
         src/gui.h
         src/gui.c
-        src/platform.m
+        src/platform.mm
         src/ray_float.c
         src/ray_float.h
         src/demo.c
@@ -36,7 +36,9 @@ target_include_directories(${NAME} PRIVATE "extras")
 #set(ASAN_CFLAGS -fsanitize=undefined -fsanitize=address -fstack-protector)
 #set(ASAN_LINKFLAGS ${ASAN_CFLAGS} -lstdc++)
 
-target_compile_options(${NAME} PRIVATE -fobjc-arc -Wpedantic ${ASAN_CFLAGS})
+set (DISABLE_WARNINGS -Wno-variadic-macros -Wno-c99-extensions -Wno-c++11-extensions)
+
+target_compile_options(${NAME} PRIVATE -fobjc-arc -Wpedantic ${DISABLE_WARNINGS} ${ASAN_CFLAGS})
 target_link_options(${NAME} PRIVATE ${ASAN_LINKFLAGS})
 
 set_target_properties(${NAME} PROPERTIES LINK_FLAGS "-Wl,-F/Library/Frameworks")

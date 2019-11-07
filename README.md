@@ -4,5 +4,13 @@ Easy to build on macOS. First make sure you have CMake and clang installed, then
 
 # TODO
 
-- enable the Horiz / Vert buttons
+- map mode
+    - write raycaster against the Z=0 plane
+    - pan and zoom
+    - navigation and animation (frames)
+    - bounds
+    - proper home position
+    - proper raycasting
+- orbit mode
+- "show frame"
 - multi-touch to zoom

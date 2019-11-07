@@ -159,7 +159,7 @@ void app_init(App* app) {
     printf("Created mesh in %.0f ms\n", stm_ms(stm_diff(stm_now(), start_mesh)));
 
     parcc_config config = {
-        .mode = PARCC_ORBIT,
+        .mode = PARCC_MAP,
         .viewport_width = sapp_width() - kSidebarWidth,
         .viewport_height = sapp_height(),
         .near_plane = kNearPlane,

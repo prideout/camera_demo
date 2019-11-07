@@ -26,6 +26,7 @@ const mu_Color kInfoTextColor = {96, 128, 255, 255};
 const mu_Color kActiveColor = {230, 230, 230, 255};
 const mu_Color kDisabledColor = {255, 255, 255, 100};
 const mu_Color kActiveButton = {75, 95, 115, 255};
+const mu_Color kActiveHover = {75, 95, 100, 255};
 const mu_Color kNormalButton = {75, 75, 75, 255};
 const mu_Color kFocusButton = {115, 115, 115, 255};
 const mu_Color kHoverButton = {95, 95, 95, 255};
@@ -44,6 +45,38 @@ static void enable(mu_Context* ctx) {
     ctx->style->colors[MU_COLOR_BUTTON] = kNormalButton;
 }
 
+static void activate(mu_Context* ctx) {
+    ctx->style->colors[MU_COLOR_TEXT] = kActiveColor;
+    ctx->style->colors[MU_COLOR_BUTTONFOCUS] = kFocusButton;
+    ctx->style->colors[MU_COLOR_BUTTONHOVER] = kActiveHover;
+    ctx->style->colors[MU_COLOR_BUTTON] = kActiveButton;
+}
+
+typedef struct {
+    const char* label;
+    int val;
+} mux_Button;
+
+static void mux_radio_buttons(mu_Context* ctx, int* val, mux_Button a, mux_Button b) {
+    if (*val == a.val) {
+        activate(ctx);
+    } else {
+        enable(ctx);
+    }
+    if (mu_button(ctx, a.label)) {
+        *val = a.val;
+    }
+    if (*val == b.val) {
+        activate(ctx);
+    } else {
+        enable(ctx);
+    }
+    if (mu_button(ctx, b.label)) {
+        *val = b.val;
+    }
+    enable(ctx);
+}
+
 static void define_ui(Gui* gui) {
     mu_Context* ctx = &gui->ctx;
     App* app = gui->app;
@@ -59,28 +92,22 @@ static void define_ui(Gui* gui) {
 
     mu_begin_window_ex(ctx, &gui->window, "", MU_OPT_NOTITLE | MU_OPT_NORESIZE);
 
-    const parcc_config config = parcc_get_config(app->camera_controller);
-    parcc_config new_config = config;
+    static parcc_config config;
+    config = parcc_get_config(app->camera_controller);
 
     mu_layout_row(ctx, 2, (int[]){142, -1}, 0);
-    int orbit = mu_button(ctx, "Orbit mode");
-    ctx->style->colors[MU_COLOR_BUTTON] = kActiveButton;
-    int map = mu_button(ctx, "Map mode");
-    ctx->style->colors[MU_COLOR_BUTTON] = kNormalButton;
-    new_config.mode = orbit ? PARCC_ORBIT : PARCC_MAP;
 
-    int vert = mu_button(ctx, "Vertical FOV");
-    ctx->style->colors[MU_COLOR_BUTTON] = kActiveButton;
-    int horiz = mu_button(ctx, "Horizontal FOV");
-    ctx->style->colors[MU_COLOR_BUTTON] = kNormalButton;
-    new_config.fov_direction = vert ? PARCC_VERTICAL : PARCC_HORIZONTAL;
+    mux_radio_buttons(ctx, (int*)&config.mode,                  //
+                      (mux_Button){"Orbit mode", PARCC_ORBIT},  //
+                      (mux_Button){"Map mode", PARCC_MAP});
+
+    mux_radio_buttons(ctx, (int*)&config.fov_direction,              //
+                      (mux_Button){"Vertical FOV", PARCC_VERTICAL},  //
+                      (mux_Button){"Horizontal FOV", PARCC_HORIZONTAL});
 
     mu_layout_row(ctx, 2, (int[]){85, -1}, 0);
     mu_label(ctx, "FOV Degrees");
-    static float degrees;
-    degrees = new_config.fov_degrees;
-    mu_slider(ctx, &degrees, 10, 90);
-    new_config.fov_degrees = degrees;
+    mu_slider(ctx, &config.fov_degrees, 10, 90);
 
     mu_layout_row(ctx, 1, (int[]){-1}, 0);
     static int raycast = 0;
@@ -108,7 +135,7 @@ static void define_ui(Gui* gui) {
 
     mu_end_window(ctx);
 
-    parcc_set_config(app->camera_controller, new_config);
+    parcc_set_config(app->camera_controller, config);
 
     mu_end(ctx);
 }

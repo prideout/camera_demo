@@ -15,6 +15,7 @@
 #include <sokol/sokol_time.h>
 
 #include "app.h"
+#include "ray_float.h"
 #include "vec_float.h"
 
 #define IMAX(a, b) (a > b ? a : b)
@@ -35,7 +36,8 @@ static void create_mesh(App* app, const char* filename) {
     printf("%s :: width = %d, height = %d\n", filename, width, height);
     float* float_data = malloc(sizeof(float) * width * height);
     for (int i = 0; i < width * height; i++) {
-        float_data[i] = (float)u8_data[i] / 255.0f;
+        const float h = (float)u8_data[i] / 255.0f;
+        float_data[i] = 2 * h * h * h;
     }
     stbi_image_free(u8_data);
 
@@ -48,29 +50,21 @@ static void create_mesh(App* app, const char* filename) {
 
     int nmeshes = par_msquares_get_count(meshes);
 
-    par_msquares_mesh const* mesh = par_msquares_get_mesh(meshes, 0);
+    par_msquares_mesh const* mesh = app->mesh = par_msquares_get_mesh(meshes, 0);
     printf("mesh 0 of %d : %d verts, %d triangles (dim = %d)\n", nmeshes, mesh->npoints,
            mesh->ntriangles, mesh->dim);
 
-    app->min_corner[0] = 5000;
-    app->max_corner[0] = -5000;
-    app->min_corner[1] = 5000;
-    app->max_corner[1] = -5000;
-    app->min_corner[2] = 5000;
-    app->max_corner[2] = -5000;
-
+    float3_set(app->min_corner, 5000, 5000, 5000);
+    float3_set(app->max_corner, -5000, -5000, -5000);
     for (int i = 0; i < mesh->npoints * 3; i += 3) {
-        app->min_corner[0] = fmin(app->min_corner[0], mesh->points[i]);
-        app->min_corner[1] = fmin(app->min_corner[1], mesh->points[i + 1]);
-        app->min_corner[2] = fmin(app->min_corner[2], mesh->points[i + 2]);
-
-        app->max_corner[0] = fmax(app->max_corner[0], mesh->points[i]);
-        app->max_corner[1] = fmax(app->max_corner[1], mesh->points[i + 1]);
-        app->max_corner[2] = fmax(app->max_corner[2], mesh->points[i + 2]);
+        float3_min(app->min_corner, app->min_corner, mesh->points + i);
+        float3_max(app->max_corner, app->max_corner, mesh->points + i);
     }
 
-    printf("min corner %g %g %g\n", app->min_corner[0], app->min_corner[1], app->min_corner[2]);
-    printf("max corner %g %g %g\n", app->max_corner[0], app->max_corner[1], app->max_corner[2]);
+    printf("bounds = ");
+    float3_print(stdout, app->min_corner);
+    float3_print(stdout, app->max_corner);
+    puts("");
 
     sg_buffer positions_buffer = sg_make_buffer(&(sg_buffer_desc){
         .size = sizeof(float) * mesh->dim * mesh->npoints,
@@ -92,8 +86,6 @@ static void create_mesh(App* app, const char* filename) {
     };
 
     app->gfx.num_elements = mesh->ntriangles * 3;
-
-    par_msquares_free(meshes);
 }
 
 static void create_texture(App* app, const char* filename, int* width, int* height) {
@@ -141,6 +133,17 @@ static void create_texture(App* app, const char* filename, int* width, int* heig
     }
 }
 
+static bool intersects_plane_z(const float origin[3], const float dir[3], float* t,
+                               void* userdata) {
+    App* app = userdata;
+    const float sw[3] = {app->min_corner[0], app->min_corner[1], 0};
+    const float se[3] = {app->max_corner[0], app->min_corner[1], 0};
+    const float ne[3] = {app->max_corner[0], app->max_corner[1], 0};
+    const float nw[3] = {app->min_corner[0], app->max_corner[1], 0};
+    float u, v;
+    return intersect_quad(origin, dir, sw, se, ne, nw, t, &u, &v);
+}
+
 void app_init(App* app) {
     stm_setup();
 
@@ -160,7 +163,12 @@ void app_init(App* app) {
     create_mesh(app, "extras/terrain/landmass.png");
     printf("Created mesh in %.0f ms\n", stm_ms(stm_diff(stm_now(), start_mesh)));
 
-    parcc_config config = {
+    const parcc_aabb aabb = {
+        {app->min_corner[0], app->min_corner[1], app->min_corner[2]},
+        {app->max_corner[0], app->max_corner[1], app->max_corner[2]},
+    };
+
+    const parcc_config config = {
         .mode = PARCC_MAP,
         .viewport_width = sapp_width() - kSidebarWidth,
         .viewport_height = sapp_height(),
@@ -168,9 +176,10 @@ void app_init(App* app) {
         .far_plane = kFarPlane,
         .fov_direction = PARCC_HORIZONTAL,
         .fov_degrees = kFov,
+        .content_aabb = aabb,
+        .raycast_function = intersects_plane_z,
+        .raycast_userdata = (void*)app,
     };
-    float3_copy(config.content_aabb.min_corner, app->min_corner);
-    float3_copy(config.content_aabb.max_corner, app->max_corner);
     app->camera_controller = parcc_create_context(config);
 
     app->gui = gui_create(app, kSidebarWidth);

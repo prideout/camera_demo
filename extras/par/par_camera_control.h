@@ -1,17 +1,18 @@
 // CAMERA CONTROL :: https://prideout.net/blog/par_camera_control/
 // Enables orbit controls (a.k.a. tumble, arcball, trackball) or pan-and-zoom like Google Maps.
 //
-// This simple library is designed to support the idea of a camera orbiting (or panning) around (or
-// over) a 3D object or swath of terrain, and that users would like to control their viewing
-// location by grabbing and dragging locations in the scene. It makes no assumptions about your
-// renderer or platform. In a sense, this is just a math library.
+// This simple library controls a camera that orbits or pans over a 3D object or terrain. Users
+// can control their viewing position by grabbing and dragging locations in the scene. Sometimes
+// this is known as "through-the-lens" camera control.
 //
-// If desired, clients could also use this library to help with "spin the object" functionality
-// rather than "orbit the camera", but the latter is what we've designed it for.
+// This library makes no assumptions about your renderer or platform. In a sense, this is just a
+// math library.
 //
-// The library takes a raycast callback in order to support precise grabbing behavior. If this is
-// not necessary for your use case (e.g. a top-down terrain with an orthgraphic projection), simply
-// provide a plane intersection function, as shown below.
+// If desired, I think clients could also use this to help with "spin the object" functionality
+// rather than "orbit the camera", but the latter is what I designed it for. The library takes a
+// raycast callback to support precise grabbing behavior. If this is not required for your use case
+// (e.g. a top-down terrain with an orthgraphic projection), simply provide a plane intersection
+// function, as shown below.
 //
 //   #define PAR_CAMERA_CONTROL_IMPLEMENTATION
 //   #include "par_camera_control.h"
@@ -21,7 +22,9 @@
 //   }
 //
 //   parcc_context* controller = parc_create_context((parcc_config) {
-//      ...
+//       .foo = bar,
+//       .raycast_function = raycast,
+//       .raycast_userdata = userdata,
 //   });
 //
 //  while (game_loop_is_alive) {
@@ -42,26 +45,31 @@
 extern "C" {
 #endif
 
-#if PARCC_USE_DOUBLE
-typedef double parcc_float;
-#else
-typedef float parcc_float;
+#ifndef parcc_float
+#define parcc_float float
 #endif
 
+// The camera controller can be configured using either a VERTICAL or HORIZONTAL field of view. This
+// specifies which of the two FOV angles should be held constant. For example, if you use a
+// horizontal FOV, shrinking the viewport width will change the height of the frustum, but will
+// leave the frustum width intact.
 typedef enum {
     PARCC_VERTICAL,
     PARCC_HORIZONTAL,
 } parcc_fov;
 
+// The controller can be configured in orbit mode or pan-and-zoom mode. The mode can be changed at
+// run time, in which case the controller will smoothly animate to a common "home" position.
 typedef enum {
-    PARCC_ORBIT,  // aka tumble or trackball
+    PARCC_ORBIT,  // aka tumble, trackball, or arcball
     PARCC_MAP,    // pan and zoom like Google Maps
 } parcc_mode;
 
+// Captured camera state (in world-space) used for Van Wijk animation in MAP mode.
 typedef struct {
-    parcc_float viewport_width;
-    parcc_float x;
-    parcc_float y;
+    parcc_float extent;  // This is either width or height, depending on fov_orientation.
+    parcc_float center_x;
+    parcc_float center_y;
 } parcc_frame;
 
 typedef struct {
@@ -69,7 +77,8 @@ typedef struct {
     parcc_float max_corner[3];
 } parcc_aabb;
 
-typedef bool (*parcc_raycast_fn)(float origin[3], float dir[3], float* t, void* userdata);
+typedef bool (*parcc_raycast_fn)(const parcc_float origin[3], const parcc_float dir[3],
+                                 parcc_float* t, void* userdata);
 
 typedef struct {
     parcc_mode mode;
@@ -77,10 +86,11 @@ typedef struct {
     int viewport_height;
     parcc_float near_plane;
     parcc_float far_plane;
-    parcc_fov fov_direction;
+    parcc_fov fov_orientation;
     parcc_float fov_degrees;
     parcc_aabb content_aabb;
-    parcc_raycast_fn raycast;
+    parcc_raycast_fn raycast_function;
+    void* raycast_userdata;
 } parcc_config;
 
 // Opaque handle to a camera controller and its memory arena.
@@ -97,18 +107,20 @@ void parcc_destroy_context(parcc_context* ctx);
 // since the previous tick.
 bool parcc_tick(parcc_context* ctx, double time);
 
-// Camera retrieval functions. This be called only after calling tick() at least once.
+// Camera retrieval functions. These can be called only after calling tick() at least once.
 void parcc_get_look_at(const parcc_context* ctx, parcc_float eyepos[3], parcc_float target[3],
                        parcc_float upward[3]);
 void parcc_get_matrix_projection(const parcc_context* ctx, parcc_float projection[16]);
 void parcc_get_matrix_view(const parcc_context* ctx, parcc_float view[16]);
 
-// Window functions, which are useful for user interaction.
+// Screen-space functions for user interaction.
 // Window coordinates are normalized into [0, +1] where (0, 0) is the top left.
 void parcc_grab_begin(parcc_context* context, parcc_float winx, parcc_float winy);
 void parcc_grab_update(parcc_context* context, parcc_float winx, parcc_float winy,
                        parcc_float scrolldelta);
 void parcc_grab_end(parcc_context* context);
+bool parcc_do_raycast(parcc_context* context, parcc_float winx, parcc_float winy,
+                      parcc_float result[3]);
 
 // Frames (captured controller states) and Van Wijk interpolation functions.
 parcc_frame parcc_get_current_frame(const parcc_context* context);
@@ -186,7 +198,7 @@ bool parcc_tick(parcc_context* context, double seconds) {
     const parcc_config cfg = context->config;
     const parcc_float aspect = (parcc_float)cfg.viewport_width / cfg.viewport_height;
     const parcc_float fov = cfg.fov_degrees;
-    if (context->config.fov_direction == PARCC_HORIZONTAL) {
+    if (context->config.fov_orientation == PARCC_HORIZONTAL) {
         float16_perspective_x(context->projection, fov, aspect, cfg.near_plane, cfg.far_plane);
     } else {
         float16_perspective_y(context->projection, fov, aspect, cfg.near_plane, cfg.far_plane);
@@ -215,6 +227,57 @@ void parcc_grab_update(parcc_context* context, parcc_float winx, parcc_float win
                        parcc_float scrolldelta) {}
 
 void parcc_grab_end(parcc_context* context) {}
+
+bool parcc_do_raycast(parcc_context* context, parcc_float winx, parcc_float winy,
+                      parcc_float result[3]) {
+    const parcc_float width = context->config.viewport_width;
+    const parcc_float height = context->config.viewport_height;
+    const parcc_float fov = context->config.fov_degrees * M_PI / 180.0;
+    const bool vertical_fov = context->config.fov_orientation == PARCC_VERTICAL;
+    const parcc_float* origin = context->eyepos;
+    void* userdata = context->config.raycast_userdata;
+
+    parcc_float gaze[3];
+    float3_subtract(gaze, context->target, origin);
+    float3_normalize(gaze);
+
+    parcc_float right[3];
+    float3_cross(right, gaze, context->upward);
+    float3_normalize(right);
+
+    parcc_float upward[3];
+    float3_cross(upward, right, gaze);
+    float3_normalize(upward);
+
+    // Remap the grid coordinates from [0, +1] to [-1, +1] and shift to the pixel center.
+    const parcc_float u = 2.0 * (winx + 0.5 / width) - 1.0;
+    const parcc_float v = 2.0 * (winy + 0.5 / height) - 1.0;
+
+    // Compute the tangent of the field-of-view angle as well as the aspect ratio.
+    const parcc_float tangent = tan(fov / 2.0);
+    const parcc_float aspect = width / height;
+
+    // Adjust the gaze so it goes through the pixel of interest rather than the grid center.
+    if (vertical_fov) {
+        float3_scale(right, tangent * u * aspect);
+        float3_scale(upward, tangent * v);
+    } else {
+        float3_scale(right, tangent * u);
+        float3_scale(upward, tangent * v / aspect);
+    }
+    float3_add(gaze, gaze, right);
+    float3_add(gaze, gaze, upward);
+    float3_normalize(gaze);
+
+    parcc_float t;
+    if (!context->config.raycast_function(origin, gaze, &t, userdata)) {
+        return false;
+    }
+
+    float3_scale(gaze, t);
+    float3_add(result, origin, gaze);
+    return true;
+}
 
 parcc_frame parcc_get_current_frame(const parcc_context* context) { return context->current_frame; }
 

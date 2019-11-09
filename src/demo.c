@@ -1,6 +1,9 @@
+#include <stdio.h>
+
 #include <sokol/sokol_app.h>
 
 #include "app.h"
+#include "vec_float.h"
 
 static App app = {0};
 
@@ -30,7 +33,13 @@ static void handler(const sapp_event* event) {
         case SAPP_EVENTTYPE_MOUSE_UP:
             parcc_grab_end(app.camera_controller);
             if (winx == mouse_down_pos[0] && winy == mouse_down_pos[1]) {
-                // click
+                printf("Clicked [%g, %g]", winx, winy);
+                float world_space[3];
+                if (parcc_do_raycast(app.camera_controller, winx, winy, world_space)) {
+                    printf(" intersection at ");
+                    float3_print(stdout, world_space);
+                }
+                printf("\n");
             }
             break;
         case SAPP_EVENTTYPE_MOUSE_SCROLL:

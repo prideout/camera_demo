@@ -111,7 +111,7 @@ static void define_ui(Gui* gui) {
 
     mu_layout_row(ctx, 1, (int[]){-1}, 0);
     static int raycast = 0;
-    mu_checkbox(ctx, &raycast, "Enable raycast for precise zoom / pan");
+    mu_checkbox(ctx, &raycast, "Raycast with mesh for precise zoom / pan");
 
     mu_layout_row(ctx, 1, (int[]){-1}, -82);
     mu_label(ctx, "");

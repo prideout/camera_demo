@@ -12,6 +12,8 @@ extern inline void float3_normalize(float dst[3]);
 extern inline void float3_copy(float dst[3], const float src[3]);
 extern inline void float3_copy_to_vec4(float dst[4], const float src[3], float w);
 extern inline void float3_lerp(float dst[3], const float a[3], const float b[3], float t);
+extern inline void float3_min(float dst[3], const float a[3], const float b[3]);
+extern inline void float3_max(float dst[3], const float a[3], const float b[3]);
 
 extern inline void float4_set(float dst[3], float x, float y, float z, float w);
 extern inline void float4_copy(float dst[4], const float src[4]);

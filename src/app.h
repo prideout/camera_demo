@@ -1,6 +1,7 @@
 #pragma once
 
 #include <par/par_camera_control.h>
+#include <par/par_msquares.h>
 
 #include <sokol/sokol_gfx.h>
 
@@ -42,6 +43,7 @@ typedef struct App {
     parcc_context* camera_controller;
     GraphicsState gfx;
     Gui* gui;
+    par_msquares_mesh const* mesh;
     float min_corner[3];
     float max_corner[3];
 } App;

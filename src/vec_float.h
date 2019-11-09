@@ -69,6 +69,18 @@ inline void float3_lerp(float dst[3], const float a[3], const float b[3], float 
     dst[2] = a[2] * (1 - t) + b[2] * t;
 }
 
+inline void float3_min(float dst[3], const float a[3], const float b[3]) {
+    dst[0] = fminf(a[0], b[0]);
+    dst[1] = fminf(a[1], b[1]);
+    dst[2] = fminf(a[2], b[2]);
+}
+
+inline void float3_max(float dst[3], const float a[3], const float b[3]) {
+    dst[0] = fmaxf(a[0], b[0]);
+    dst[1] = fmaxf(a[1], b[1]);
+    dst[2] = fmaxf(a[2], b[2]);
+}
+
 inline void float4_set(float dst[4], float x, float y, float z, float w) {
     dst[0] = x;
     dst[1] = y;

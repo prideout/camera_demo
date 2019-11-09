@@ -69,6 +69,18 @@ inline void double3_lerp(double dst[3], const double a[3], const double b[3], do
     dst[2] = a[2] * (1 - t) + b[2] * t;
 }
 
+inline void double3_min(double dst[3], const double a[3], const double b[3]) {
+    dst[0] = fmin(a[0], b[0]);
+    dst[1] = fmin(a[1], b[1]);
+    dst[2] = fmin(a[2], b[2]);
+}
+
+inline void double3_max(double dst[3], const double a[3], const double b[3]) {
+    dst[0] = fmax(a[0], b[0]);
+    dst[1] = fmax(a[1], b[1]);
+    dst[2] = fmax(a[2], b[2]);
+}
+
 inline void double4_set(double dst[4], double x, double y, double z, double w) {
     dst[0] = x;
     dst[1] = y;

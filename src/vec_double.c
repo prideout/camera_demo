@@ -12,6 +12,8 @@ extern inline void double3_normalize(double dst[3]);
 extern inline void double3_copy(double dst[3], const double src[3]);
 extern inline void double3_copy_to_vec4(double dst[4], const double src[3], double w);
 extern inline void double3_lerp(double dst[3], const double a[3], const double b[3], double t);
+extern inline void double3_min(double dst[3], const double a[3], const double b[3]);
+extern inline void double3_max(double dst[3], const double a[3], const double b[3]);
 
 extern inline void double4_set(double dst[3], double x, double y, double z, double w);
 extern inline void double4_copy(double dst[4], const double src[4]);

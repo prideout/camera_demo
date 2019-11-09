@@ -5,26 +5,36 @@ Easy to build on macOS. First make sure you have CMake and clang installed, then
 # TODO
 
 - map mode
-    - use ray_float to write raycaster against the Z=0 plane
+    - window coordinates should just be "int"
+    - the "aabb vs mesh" checkbox can be implemented
+        - implement the nanort C interface (nanort_c.h)
     - pan and zoom
-    - implement the nanort C interface (nanort_c.h)
+    - grabbing mountain tops should work
+    - Ensure that maps need not be on the Z plane. (working_plane)
+    - Provide a stock plane intersection function. (or aabb)
     - navigation and animation (frames)
-    - bounds
+    - zoom and pan constraints (make it optional, add a checkbox)
     - proper home position
-    - proper raycasting
+
 - orbit mode
 - "show frame"
+- two emscripten demos (no microui stuff, probably)
 - multi-touch to zoom
+
+# Longer term ideas
+
+- Consider adding FREE mode that changes the look-at vectors directly (forward / backward etc)
+- Demonstrate precision crosshairs for deep zoom, similar to my old blog post.
+- Tinkercad style cube the style of ImGuizmo.
 
 # Notes
 
+```
 JuliaComputing/llvm-cbe
-
-Screen-space Camera Constaints
 
 BLINN, J. 1988. Where am I? What am I looking at? In IEEE Computer Graphics and Applications. Vol. 22.
 179–188.
 
 GLEICHER, M. AND WITKIN, A. 1992. Through-the-lens camera control. In Siggraph, E. E. Catmull, Ed.
 Vol. 26. 331–340. ISBN 0-201-51585-7. Held in Chicago, Illinois.
-
+```

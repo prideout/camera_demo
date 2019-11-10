@@ -5,7 +5,6 @@ Easy to build on macOS. First make sure you have CMake and clang installed, then
 # TODO
 
 - map mode
-    - window coordinates should just be "int"
     - the "aabb vs mesh" checkbox can be implemented
         - implement the nanort C interface (nanort_c.h)
     - pan and zoom

@@ -14,8 +14,8 @@ static void handler(const sapp_event* event) {
     }
     const float vpwidth = sapp_width() - kSidebarWidth;
     const float vpheight = sapp_height();
-    const float winx = (event->mouse_x - kSidebarWidth) / vpwidth;
-    const float winy = 1.0 - event->mouse_y / vpheight;
+    const int winx = (event->mouse_x - kSidebarWidth);
+    const int winy = vpheight - 1 - event->mouse_y;
     switch (event->type) {
         case SAPP_EVENTTYPE_RESIZED: {
             parcc_config config = parcc_get_config(app.camera_controller);
@@ -33,7 +33,7 @@ static void handler(const sapp_event* event) {
         case SAPP_EVENTTYPE_MOUSE_UP:
             parcc_grab_end(app.camera_controller);
             if (winx == mouse_down_pos[0] && winy == mouse_down_pos[1]) {
-                printf("Clicked [%g, %g]", winx, winy);
+                printf("Clicked [%d, %d]", winx, winy);
                 float world_space[3];
                 if (parcc_do_raycast(app.camera_controller, winx, winy, world_space)) {
                     printf(" intersection at ");

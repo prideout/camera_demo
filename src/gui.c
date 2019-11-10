@@ -101,7 +101,7 @@ static void define_ui(Gui* gui) {
                       (mux_Button){"Orbit mode", PARCC_ORBIT},  //
                       (mux_Button){"Map mode", PARCC_MAP});
 
-    mux_radio_buttons(ctx, (int*)&config.fov_direction,              //
+    mux_radio_buttons(ctx, (int*)&config.fov_orientation,            //
                       (mux_Button){"Vertical FOV", PARCC_VERTICAL},  //
                       (mux_Button){"Horizontal FOV", PARCC_HORIZONTAL});
 

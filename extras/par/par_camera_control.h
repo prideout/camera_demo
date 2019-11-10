@@ -113,14 +113,13 @@ void parcc_get_look_at(const parcc_context* ctx, parcc_float eyepos[3], parcc_fl
 void parcc_get_matrix_projection(const parcc_context* ctx, parcc_float projection[16]);
 void parcc_get_matrix_view(const parcc_context* ctx, parcc_float view[16]);
 
-// Screen-space functions for user interaction.
-// Window coordinates are normalized into [0, +1] where (0, 0) is the top left.
-void parcc_grab_begin(parcc_context* context, parcc_float winx, parcc_float winy);
-void parcc_grab_update(parcc_context* context, parcc_float winx, parcc_float winy,
-                       parcc_float scrolldelta);
+// Screen-space functions for user interaction. Each of these functions take winx / winy coords.
+// The winx coord should be in [0, viewport_width) where 0 is the left-most column.
+// The winy coord should be in [0, viewport_height) where 0 is the top-most row.
+void parcc_grab_begin(parcc_context* context, int winx, int winy);
+void parcc_grab_update(parcc_context* context, int winx, int winy, parcc_float scrolldelta);
 void parcc_grab_end(parcc_context* context);
-bool parcc_do_raycast(parcc_context* context, parcc_float winx, parcc_float winy,
-                      parcc_float result[3]);
+bool parcc_do_raycast(parcc_context* context, int winx, int winy, parcc_float result[3]);
 
 // Frames (captured controller states) and Van Wijk interpolation functions.
 parcc_frame parcc_get_current_frame(const parcc_context* context);
@@ -221,15 +220,13 @@ void parcc_get_matrix_view(const parcc_context* ctx, parcc_float view[16]) {
     float16_copy(view, ctx->viewmatrix);
 }
 
-void parcc_grab_begin(parcc_context* context, parcc_float winx, parcc_float winy) {}
+void parcc_grab_begin(parcc_context* context, int winx, int winy) {}
 
-void parcc_grab_update(parcc_context* context, parcc_float winx, parcc_float winy,
-                       parcc_float scrolldelta) {}
+void parcc_grab_update(parcc_context* context, int winx, int winy, parcc_float scrolldelta) {}
 
 void parcc_grab_end(parcc_context* context) {}
 
-bool parcc_do_raycast(parcc_context* context, parcc_float winx, parcc_float winy,
-                      parcc_float result[3]) {
+bool parcc_do_raycast(parcc_context* context, int winx, int winy, parcc_float result[3]) {
     const parcc_float width = context->config.viewport_width;
     const parcc_float height = context->config.viewport_height;
     const parcc_float fov = context->config.fov_degrees * M_PI / 180.0;
@@ -249,9 +246,9 @@ bool parcc_do_raycast(parcc_context* context, parcc_float winx, parcc_float winy
     float3_cross(upward, right, gaze);
     float3_normalize(upward);
 
-    // Remap the grid coordinates from [0, +1] to [-1, +1] and shift to the pixel center.
-    const parcc_float u = 2.0 * (winx + 0.5 / width) - 1.0;
-    const parcc_float v = 2.0 * (winy + 0.5 / height) - 1.0;
+    // Remap the grid coordinate into [-1, +1] and shift it to the pixel center.
+    const parcc_float u = 2.0 * (winx + 0.5) / width - 1.0;
+    const parcc_float v = 2.0 * (winy + 0.5) / height - 1.0;
 
     // Compute the tangent of the field-of-view angle as well as the aspect ratio.
     const parcc_float tangent = tan(fov / 2.0);

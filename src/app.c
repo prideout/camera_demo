@@ -174,7 +174,7 @@ void app_init(App* app) {
         .viewport_height = sapp_height(),
         .near_plane = kNearPlane,
         .far_plane = kFarPlane,
-        .fov_direction = PARCC_HORIZONTAL,
+        .fov_orientation = PARCC_HORIZONTAL,
         .fov_degrees = kFov,
         .content_aabb = aabb,
         .raycast_function = intersects_plane_z,

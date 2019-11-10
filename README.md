@@ -10,8 +10,11 @@ do `make run`. For other platforms, simply invoke CMake in the way that you norm
 # TODO
 
 - map mode
-    - the "aabb vs mesh" checkbox can be implemented
-        - implement the nanort C interface (nanort_c.h)
+    - faster raytracing: enkiTS with lambdas
+        https://github.com/dougbinks/enkiTS
+    - the raytraced image looks wrong
+    - aabb raycaster
+        - leverage the existing quad intersector
     - pan and zoom
     - grabbing mountain tops should work
     - Ensure that maps need not be on the Z plane. (working_plane)

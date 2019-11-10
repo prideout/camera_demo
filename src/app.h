@@ -5,6 +5,8 @@
 
 #include <sokol/sokol_gfx.h>
 
+#include <nanort/nanort_c.h>
+
 #include "camera.h"
 #include "gui.h"
 
@@ -44,6 +46,7 @@ typedef struct App {
     GraphicsState gfx;
     Gui* gui;
     par_msquares_mesh const* mesh;
+    part_context* raytracer;
     float min_corner[3];
     float max_corner[3];
 } App;
@@ -51,4 +54,7 @@ typedef struct App {
 void app_init(App* app);
 void app_draw(App* app);
 void app_start_camera_transition(App* app);
-void app_update_projection(App* app);
+void app_start_raytrace(App* app);
+
+bool app_intersects_aabb(const float origin[3], const float dir[3], float* t, void* userdata);
+bool app_intersects_mesh(const float origin[3], const float dir[3], float* t, void* userdata);

@@ -10,6 +10,7 @@
 
 #include <stb/stb_image.h>
 #include <stb/stb_image_resize.h>
+#include <stb/stb_image_write.h>
 
 #include <sokol/sokol_gfx.h>
 #include <sokol/sokol_time.h>
@@ -133,8 +134,7 @@ static void create_texture(App* app, const char* filename, int* width, int* heig
     }
 }
 
-static bool intersects_plane_z(const float origin[3], const float dir[3], float* t,
-                               void* userdata) {
+bool app_intersects_aabb(const float origin[3], const float dir[3], float* t, void* userdata) {
     App* app = userdata;
     const float sw[3] = {app->min_corner[0], app->min_corner[1], 0};
     const float se[3] = {app->max_corner[0], app->min_corner[1], 0};
@@ -142,6 +142,22 @@ static bool intersects_plane_z(const float origin[3], const float dir[3], float*
     const float nw[3] = {app->min_corner[0], app->max_corner[1], 0};
     float u, v;
     return intersect_quad(origin, dir, sw, se, ne, nw, t, &u, &v);
+}
+
+bool app_intersects_mesh(const float origin[3], const float dir[3], float* t, void* userdata) {
+    App* app = userdata;
+    part_ray ray = {
+        .org = {origin[0], origin[1], origin[2]},
+        .dir = {dir[0], dir[1], dir[2]},
+        .min_t = 0.0f,
+        .max_t = 9999.0f,
+    };
+    part_intersection isect;
+    if (!part_trace(app->raytracer, ray, &isect)) {
+        return false;
+    }
+    *t = isect.t;
+    return true;
 }
 
 void app_init(App* app) {
@@ -161,7 +177,17 @@ void app_init(App* app) {
 
     const uint64_t start_mesh = stm_now();
     create_mesh(app, "extras/terrain/landmass.png");
-    printf("Created mesh in %.0f ms\n", stm_ms(stm_diff(stm_now(), start_mesh)));
+    printf("Created terrain mesh in %.0f ms\n", stm_ms(stm_diff(stm_now(), start_mesh)));
+
+    const uint64_t start_bvh = stm_now();
+    part_mesh mesh = {
+        .vertices = app->mesh->points,
+        .num_vertices = app->mesh->npoints,
+        .triangles = app->mesh->triangles,
+        .num_triangles = app->mesh->ntriangles,
+    };
+    app->raytracer = part_create_context((part_config){0}, mesh);
+    printf("Created raytracer BVH in %.0f ms\n", stm_ms(stm_diff(stm_now(), start_bvh)));
 
     const parcc_aabb aabb = {
         {app->min_corner[0], app->min_corner[1], app->min_corner[2]},
@@ -177,7 +203,7 @@ void app_init(App* app) {
         .fov_orientation = PARCC_HORIZONTAL,
         .fov_degrees = kFov,
         .content_aabb = aabb,
-        .raycast_function = intersects_plane_z,
+        .raycast_function = app_intersects_mesh,
         .raycast_userdata = (void*)app,
     };
     app->camera_controller = parcc_create_context(config);
@@ -274,4 +300,27 @@ void app_start_camera_transition(App* app) {
     app->transition.source = parcc_get_current_frame(app->camera_controller);
     app->transition.target = parcc_get_home_frame(app->camera_controller, 10.0);
     app->transition.van_wijk = true;
+}
+
+void app_start_raytrace(App* app) {
+    const int vpwidth = sapp_width() - kSidebarWidth;
+    const int vpheight = sapp_height();
+    uint8_t* image = calloc(vpwidth * vpheight, 1);
+    float world_space[3];
+    const float maxz = app->max_corner[2];
+    const float minz = app->min_corner[2];
+    const float invz = 1.0 / (maxz - minz);
+    puts("Starting raytrace...");
+    for (int winy = 0; winy < vpheight; winy++) {
+        printf("%d\n", vpheight - winy);
+        for (int winx = 0; winx < vpwidth; winx++) {
+            if (parcc_do_raycast(app->camera_controller, winx, winy, world_space)) {
+                const float z = (world_space[2] - minz) * invz;
+                image[winy * vpwidth + winx] = 255;
+            }
+        }
+    }
+    puts("Done.");
+    stbi_write_png("raytraced.png", vpwidth, vpheight, 1, image, vpwidth);
+    free(image);
 }

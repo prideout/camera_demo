@@ -110,8 +110,9 @@ static void define_ui(Gui* gui) {
     mu_slider(ctx, &config.fov_degrees, 10, 90);
 
     mu_layout_row(ctx, 1, (int[]){-1}, 0);
-    static int raycast = 0;
+    int raycast = config.raycast_function == app_intersects_mesh;
     mu_checkbox(ctx, &raycast, "Raycast with mesh for precise zoom / pan");
+    config.raycast_function = raycast ? app_intersects_mesh : app_intersects_aabb;
 
     mu_layout_row(ctx, 1, (int[]){-1}, -82);
     mu_label(ctx, "");
@@ -210,6 +211,9 @@ bool gui_handle(Gui* gui, const sapp_event* ev) {
             }
             if (key == 'g') {
                 app_start_camera_transition(gui->app);
+            }
+            if (key == 'r') {
+                app_start_raytrace(gui->app);
             }
             break;
         }

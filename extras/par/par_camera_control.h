@@ -1,18 +1,22 @@
 // CAMERA CONTROL :: https://prideout.net/blog/par_camera_control/
 // Enables orbit controls (a.k.a. tumble, arcball, trackball) or pan-and-zoom like Google Maps.
 //
-// This simple library controls a camera that orbits or pans over a 3D object or terrain. Users
-// can control their viewing position by grabbing and dragging locations in the scene. Sometimes
-// this is known as "through-the-lens" camera control.
+// This simple library controls a camera that orbits or pans over a 3D object or terrain. Users can
+// control their viewing position by grabbing and dragging locations in the scene. Sometimes this is
+// known as "through-the-lens" camera control. No assumptions are made about the renderer or
+// platform. In a sense, this is just a math library.
 //
-// This library makes no assumptions about your renderer or platform. In a sense, this is just a
-// math library.
+// When the controller is in ORBIT mode, it allows users to move the camera longitudinally or
+// latitudinally, but does not allow for tilting the "up" vector. The idea behind this constraint is
+// that people rarely crook their heads sideways when examining 3D objects. By design, quaternions
+// are not used. Instead the orientation of the camera is defined by a Y-axis rotation followed by
+// an X-axis rotation.
 //
-// If desired, I think clients could also use this to help with "spin the object" functionality
-// rather than "orbit the camera", but the latter is what I designed it for. The library takes a
-// raycast callback to support precise grabbing behavior. If this is not required for your use case
-// (e.g. a top-down terrain with an orthgraphic projection), simply provide a plane intersection
-// function, as shown below.
+// Clients can also use this to implement "spin the object" functionality rather than "orbit the
+// camera", but the latter is what I designed it for. The library takes a raycast callback to
+// support precise grabbing behavior. If this is not required for your use case (e.g. a top-down
+// terrain with an orthgraphic projection), simply provide a plane intersection function, as shown
+// below.
 //
 //   #define PAR_CAMERA_CONTROL_IMPLEMENTATION
 //   #include "par_camera_control.h"

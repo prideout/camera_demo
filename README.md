@@ -10,10 +10,6 @@ do `make run`. For other platforms, simply invoke CMake in the way that you norm
 # TODO
 
 - map mode
-    - the raytraced image looks wrong
-        - something goes wrong parcc_do_raycast
-    - aabb raycaster
-        - leverage the existing quad intersector
     - pan and zoom
     - grabbing mountain tops should work
     - Ensure that maps need not be on the Z plane. (working_plane)

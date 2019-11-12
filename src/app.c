@@ -134,16 +134,6 @@ static void create_texture(App* app, const char* filename, int* width, int* heig
     }
 }
 
-bool app_intersects_aabb(const float origin[3], const float dir[3], float* t, void* userdata) {
-    App* app = userdata;
-    const float sw[3] = {app->min_corner[0], app->min_corner[1], 0};
-    const float se[3] = {app->max_corner[0], app->min_corner[1], 0};
-    const float ne[3] = {app->max_corner[0], app->max_corner[1], 0};
-    const float nw[3] = {app->min_corner[0], app->max_corner[1], 0};
-    float u, v;
-    return intersect_quad(origin, dir, sw, se, ne, nw, t, &u, &v);
-}
-
 bool app_intersects_mesh(const float origin[3], const float dir[3], float* t, void* userdata) {
     App* app = userdata;
     part_ray ray = {

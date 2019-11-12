@@ -112,7 +112,7 @@ static void define_ui(Gui* gui) {
     mu_layout_row(ctx, 1, (int[]){-1}, 0);
     int raycast = config.raycast_function == app_intersects_mesh;
     mu_checkbox(ctx, &raycast, "Raycast with mesh for precise zoom / pan");
-    config.raycast_function = raycast ? app_intersects_mesh : app_intersects_aabb;
+    config.raycast_function = raycast ? app_intersects_mesh : NULL;
 
     mu_layout_row(ctx, 1, (int[]){-1}, -82);
     mu_label(ctx, "");
@@ -137,7 +137,6 @@ static void define_ui(Gui* gui) {
     mu_end_window(ctx);
 
     parcc_set_config(app->camera_controller, config);
-
     mu_end(ctx);
 }
 

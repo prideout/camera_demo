@@ -15,8 +15,8 @@
 // Clients can also use this to implement "spin the object" functionality rather than "orbit the
 // camera", but the latter is what I designed it for. The library takes a raycast callback to
 // support precise grabbing behavior. If this is not required for your use case (e.g. a top-down
-// terrain with an orthgraphic projection), simply provide a plane intersection function, as shown
-// below.
+// terrain with an orthgraphic projection), provide NULL for the callback and the library will
+// simply raycast against the axis-aligned bounding box that you provide.
 //
 //   #define PAR_CAMERA_CONTROL_IMPLEMENTATION
 //   #include "par_camera_control.h"
@@ -146,6 +146,7 @@ double parcc_get_interpolation_duration(parcc_frame a, parcc_frame b);
 #include <memory.h>
 #include <stdlib.h>
 
+#include "../../src/ray_float.h"  // TODO: integrate
 #include "../../src/vec_float.h"  // TODO: integrate
 
 #ifndef PAR_PI
@@ -230,13 +231,73 @@ void parcc_grab_update(parcc_context* context, int winx, int winy, parcc_float s
 
 void parcc_grab_end(parcc_context* context) {}
 
+static bool parcc_raycast_aabb(const parcc_float origin[3], const parcc_float dir[3],
+                               parcc_float* t, void* userdata) {
+    typedef struct parcc_vec3 {
+        parcc_float x, y, z;
+    } parcc_vec3;
+    parcc_context* context = (parcc_context*)userdata;
+    const parcc_vec3 minc = *((parcc_vec3*)context->config.content_aabb.min_corner);
+    const parcc_vec3 maxc = *((parcc_vec3*)context->config.content_aabb.max_corner);
+
+    // The front face is defined in CCW order and the back face is defined in CW order.
+    // Both start at the lower-left corner.
+
+    const parcc_float fr[4][3] = {
+        {minc.x, minc.y, maxc.z},
+        {maxc.x, minc.y, maxc.z},
+        {maxc.x, maxc.y, maxc.z},
+        {minc.x, maxc.y, maxc.z},
+    };
+
+    const parcc_float bk[4][3] = {
+        {minc.x, minc.y, minc.z},
+        {minc.x, maxc.y, minc.z},
+        {maxc.x, maxc.y, minc.z},
+        {maxc.x, minc.y, minc.z},
+    };
+
+    float u, v;
+
+    // Front
+    if (intersect_quad(origin, dir, fr[0], fr[1], fr[2], fr[3], t, &u, &v)) {
+        return true;
+    }
+
+    // Back
+    if (intersect_quad(origin, dir, bk[0], bk[1], bk[2], bk[3], t, &u, &v)) {
+        return true;
+    }
+
+    // Right
+    if (intersect_quad(origin, dir, fr[2], fr[1], bk[3], bk[2], t, &u, &v)) {
+        return true;
+    }
+
+    // Left
+    if (intersect_quad(origin, dir, fr[3], bk[1], bk[0], fr[0], t, &u, &v)) {
+        return true;
+    }
+
+    // Bottom
+    if (intersect_quad(origin, dir, bk[0], bk[3], fr[1], fr[0], t, &u, &v)) {
+        return true;
+    }
+
+    // Top
+    if (intersect_quad(origin, dir, bk[1], fr[3], fr[2], bk[2], t, &u, &v)) {
+        return true;
+    }
+
+    return false;
+}
+
 bool parcc_do_raycast(parcc_context* context, int winx, int winy, parcc_float result[3]) {
     const parcc_float width = context->config.viewport_width;
     const parcc_float height = context->config.viewport_height;
     const parcc_float fov = context->config.fov_degrees * VEC_PI / 180.0;
     const bool vertical_fov = context->config.fov_orientation == PARCC_VERTICAL;
     const parcc_float* origin = context->eyepos;
-    void* userdata = context->config.raycast_userdata;
 
     parcc_float gaze[3];
     float3_subtract(gaze, context->target, origin);
@@ -270,8 +331,16 @@ bool parcc_do_raycast(parcc_context* context, int winx, int winy, parcc_float re
     float3_add(gaze, gaze, upward);
     float3_normalize(gaze);
 
+    // Invoke the user's callback or fallback to our AABB intersector.
+    parcc_raycast_fn callback = context->config.raycast_function;
+    void* userdata = context->config.raycast_userdata;
+    if (!callback) {
+        callback = parcc_raycast_aabb;
+        userdata = context;
+    }
+
     parcc_float t;
-    if (!context->config.raycast_function(origin, gaze, &t, userdata)) {
+    if (!callback(origin, gaze, &t, userdata)) {
         return false;
     }
 

@@ -10,9 +10,8 @@ do `make run`. For other platforms, simply invoke CMake in the way that you norm
 # TODO
 
 - map mode
-    - faster raytracing: enkiTS with lambdas
-        https://github.com/dougbinks/enkiTS
     - the raytraced image looks wrong
+        - something goes wrong parcc_do_raycast
     - aabb raycaster
         - leverage the existing quad intersector
     - pan and zoom
@@ -56,4 +55,6 @@ BLINN, J. 1988. Where am I? What am I looking at? In IEEE Computer Graphics and 
 
 GLEICHER, M. AND WITKIN, A. 1992. Through-the-lens camera control. In Siggraph, E. E. Catmull, Ed.
 Vol. 26. 331–340. ISBN 0-201-51585-7. Held in Chicago, Illinois.
+
+https://github.com/dougbinks/enkiTS
 ```

@@ -233,7 +233,7 @@ void parcc_grab_end(parcc_context* context) {}
 bool parcc_do_raycast(parcc_context* context, int winx, int winy, parcc_float result[3]) {
     const parcc_float width = context->config.viewport_width;
     const parcc_float height = context->config.viewport_height;
-    const parcc_float fov = context->config.fov_degrees * M_PI / 180.0;
+    const parcc_float fov = context->config.fov_degrees * VEC_PI / 180.0;
     const bool vertical_fov = context->config.fov_orientation == PARCC_VERTICAL;
     const parcc_float* origin = context->eyepos;
     void* userdata = context->config.raycast_userdata;

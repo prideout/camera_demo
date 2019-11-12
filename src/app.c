@@ -38,7 +38,7 @@ static void create_mesh(App* app, const char* filename) {
     float* float_data = malloc(sizeof(float) * width * height);
     for (int i = 0; i < width * height; i++) {
         const float h = (float)u8_data[i] / 255.0f;
-        float_data[i] = 2 * h * h * h;
+        float_data[i] = 2.0 * h * h * h / 15.0;
     }
     stbi_image_free(u8_data);
 
@@ -311,16 +311,17 @@ void app_start_raytrace(App* app) {
     const float minz = app->min_corner[2];
     const float invz = 1.0 / (maxz - minz);
     puts("Starting raytrace...");
-    for (int winy = 0; winy < vpheight; winy++) {
+    for (int winy = 0; winy < vpheight; winy += 2) {
         printf("%d\n", vpheight - winy);
-        for (int winx = 0; winx < vpwidth; winx++) {
+        for (int winx = 0; winx < vpwidth; winx += 2) {
             if (parcc_do_raycast(app->camera_controller, winx, winy, world_space)) {
                 const float z = (world_space[2] - minz) * invz;
-                image[winy * vpwidth + winx] = 255;
+                image[winy * vpwidth + winx] = 255.0f * z;
             }
         }
     }
     puts("Done.");
+    stbi_flip_vertically_on_write(1);
     stbi_write_png("raytraced.png", vpwidth, vpheight, 1, image, vpwidth);
     free(image);
 }

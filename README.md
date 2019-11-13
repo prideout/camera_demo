@@ -9,11 +9,16 @@ do `make run`. For other platforms, simply invoke CMake in the way that you norm
 
 # TODO
 
+- works well when zoomed in but not zoomed out...precision issues? maybe q/p blows up.
+
+- fallback to a working_plane when the raycast fails...this might make more sense than the aabb
+
+- perfect zoom
+
+- blog entry on the math
+
 - map mode
-    - pan and zoom
-    - grabbing mountain tops should work
     - Ensure that maps need not be on the Z plane. (working_plane)
-    - Provide a stock plane intersection function. (or aabb)
     - navigation and animation (frames)
     - zoom and pan constraints (make it optional, add a checkbox)
     - proper home position
@@ -22,6 +27,7 @@ do `make run`. For other platforms, simply invoke CMake in the way that you norm
 - "show frame"
 - two emscripten demos (no microui stuff, probably)
 - multi-touch to zoom
+- slider for exaggerating mountains?
 
 # Docs branch
 

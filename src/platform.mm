@@ -1,7 +1,6 @@
 #define SOKOL_GLCORE33
 #define SOKOL_IMPL
 #define PARSH_ENABLE_STDIO
-#define PAR_CAMERA_CONTROL_IMPLEMENTATION
 #define PAR_SHADERS_IMPLEMENTATION
 #define PAR_MSQUARES_IMPLEMENTATION
 #define STB_IMAGE_RESIZE_IMPLEMENTATION
@@ -12,7 +11,6 @@
 
 #include <par/par_shaders.h>
 #include <par/par_msquares.h>
-#include <par/par_camera_control.h>
 
 #include <sokol/sokol_app.h>
 #include <sokol/sokol_gfx.h>

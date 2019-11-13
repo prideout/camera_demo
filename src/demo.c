@@ -1,3 +1,4 @@
+#define PAR_CAMERA_CONTROL_IMPLEMENTATION
 #include <stdio.h>
 
 #include <sokol/sokol_app.h>
@@ -50,8 +51,11 @@ static void handler(const sapp_event* event) {
             break;
         case SAPP_EVENTTYPE_MOUSE_ENTER:
         case SAPP_EVENTTYPE_MOUSE_LEAVE:
+            break;
         case SAPP_EVENTTYPE_TOUCHES_BEGAN:
+            break;
         case SAPP_EVENTTYPE_TOUCHES_MOVED:
+            break;
         case SAPP_EVENTTYPE_TOUCHES_ENDED:
         case SAPP_EVENTTYPE_TOUCHES_CANCELLED:
             break;

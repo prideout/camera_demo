@@ -12,8 +12,8 @@
 
 #define kSidebarWidth (300)
 #define kFov (33)
-#define kNearPlane (1)
-#define kFarPlane (1000)
+#define kNearPlane (0.01)
+#define kFarPlane (100)
 
 typedef enum { VISUAL_MODE_2D, VISUAL_MODE_3D } VisualMode;
 

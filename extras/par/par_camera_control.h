@@ -178,7 +178,18 @@ struct parcc_context_s {
     parcc_float eyepos[3];
     parcc_float target[3];
     parcc_float upward[3];
+
+    bool grabbing;
+    parcc_float grab_point_near[3];
+    parcc_float grab_point_world[3];
+    parcc_float grab_point_eyepos[3];
+    parcc_float grab_point_target[3];
 };
+
+static void parcc_get_ray_near(parcc_context* context, int winx, int winy, parcc_float result[3]);
+
+static bool parcc_raycast_aabb(const parcc_float origin[3], const parcc_float dir[3],
+                               parcc_float* t, void* userdata);
 
 parcc_context* parcc_create_context(parcc_config config) {
     parcc_context* context = PAR_CALLOC(parcc_context, 1);
@@ -225,72 +236,61 @@ void parcc_get_matrix_view(const parcc_context* ctx, parcc_float view[16]) {
     float16_copy(view, ctx->viewmatrix);
 }
 
-void parcc_grab_begin(parcc_context* context, int winx, int winy) {}
-
-void parcc_grab_update(parcc_context* context, int winx, int winy, parcc_float scrolldelta) {}
-
-void parcc_grab_end(parcc_context* context) {}
-
-static bool parcc_raycast_aabb(const parcc_float origin[3], const parcc_float dir[3],
-                               parcc_float* t, void* userdata) {
-    typedef struct parcc_vec3 {
-        parcc_float x, y, z;
-    } parcc_vec3;
-    parcc_context* context = (parcc_context*)userdata;
-    const parcc_vec3 minc = *((parcc_vec3*)context->config.content_aabb.min_corner);
-    const parcc_vec3 maxc = *((parcc_vec3*)context->config.content_aabb.max_corner);
-
-    // The front face is defined in CCW order and the back face is defined in CW order.
-    // Both start at the lower-left corner.
-
-    const parcc_float fr[4][3] = {
-        {minc.x, minc.y, maxc.z},
-        {maxc.x, minc.y, maxc.z},
-        {maxc.x, maxc.y, maxc.z},
-        {minc.x, maxc.y, maxc.z},
-    };
-
-    const parcc_float bk[4][3] = {
-        {minc.x, minc.y, minc.z},
-        {minc.x, maxc.y, minc.z},
-        {maxc.x, maxc.y, minc.z},
-        {maxc.x, minc.y, minc.z},
-    };
-
-    float u, v;
-
-    // Front
-    if (intersect_quad(origin, dir, fr[0], fr[1], fr[2], fr[3], t, &u, &v)) {
-        return true;
+void parcc_grab_begin(parcc_context* context, int winx, int winy) {
+    if (!parcc_do_raycast(context, winx, winy, context->grab_point_world)) {
+        puts("missed\n");
+        return;
     }
 
-    // Back
-    if (intersect_quad(origin, dir, bk[0], bk[1], bk[2], bk[3], t, &u, &v)) {
-        return true;
-    }
+    printf("grabbed ");
+    float3_print(stdout, context->grab_point_world);
+    printf("\n");
 
-    // Right
-    if (intersect_quad(origin, dir, fr[2], fr[1], bk[3], bk[2], t, &u, &v)) {
-        return true;
-    }
-
-    // Left
-    if (intersect_quad(origin, dir, fr[3], bk[1], bk[0], fr[0], t, &u, &v)) {
-        return true;
-    }
-
-    // Bottom
-    if (intersect_quad(origin, dir, bk[0], bk[3], fr[1], fr[0], t, &u, &v)) {
-        return true;
-    }
-
-    // Top
-    if (intersect_quad(origin, dir, bk[1], fr[3], fr[2], bk[2], t, &u, &v)) {
-        return true;
-    }
-
-    return false;
+    context->grabbing = true;
+    parcc_get_ray_near(context, winx, winy, context->grab_point_near);
+    float3_copy(context->grab_point_eyepos, context->eyepos);
+    float3_copy(context->grab_point_target, context->target);
 }
+
+// This is similar to the diagram at:
+// https://stackoverflow.com/questions/12097693/3d-scene-panning-in-perspective-projection-opengl
+// Note however that the answers's last sentence is not quite correct.
+
+void parcc_grab_update(parcc_context* context, int winx, int winy, parcc_float scrolldelta) {
+    parcc_config cfg = context->config;
+    const parcc_float vpheight = context->eyepos[2] * 2.0 * tan(cfg.fov_degrees * VEC_PI / 360.0);
+    const parcc_float vpwidth = vpheight * cfg.viewport_width / cfg.viewport_height;
+    const parcc_float vpx = 2.0 * (float)winx / cfg.viewport_width - 1.0;
+    const parcc_float vpy = 2.0 * (float)winy / cfg.viewport_height - 1.0;
+
+    parcc_float p_vec[3];
+    float3_subtract(p_vec, context->grab_point_world, context->grab_point_eyepos);
+    const parcc_float p_len = float3_length(p_vec);
+
+    parcc_float q_vec[3];
+    float3_subtract(q_vec, context->grab_point_near, context->grab_point_eyepos);
+    const parcc_float q_len = float3_length(q_vec);
+
+    parcc_float near_point[3];
+    parcc_get_ray_near(context, winx, winy, near_point);
+
+    parcc_float translation[3];
+    float3_subtract(translation, near_point, context->grab_point_near);
+    float3_scale(translation, -1.0 / (q_len / p_len - 1.0));
+
+    if (context->grabbing) {
+        float3_add(context->eyepos, context->grab_point_eyepos, translation);
+        float3_add(context->target, context->grab_point_target, translation);
+    }
+
+    // Handle zoom.
+    if (scrolldelta != 0.0) {
+        // TODO
+        context->eyepos[2] -= scrolldelta * context->eyepos[2] * 0.01;  // TODO: kZoomSpeed
+    }
+}
+
+void parcc_grab_end(parcc_context* context) { context->grabbing = false; }
 
 bool parcc_do_raycast(parcc_context* context, int winx, int winy, parcc_float result[3]) {
     const parcc_float width = context->config.viewport_width;
@@ -362,6 +362,111 @@ parcc_frame parcc_interpolate_frames(parcc_frame a, parcc_frame b, double t) {
 }
 
 double parcc_get_interpolation_duration(parcc_frame a, parcc_frame b) { return 1.0; }
+
+static bool parcc_raycast_aabb(const parcc_float origin[3], const parcc_float dir[3],
+                               parcc_float* t, void* userdata) {
+    typedef struct parcc_vec3 {
+        parcc_float x, y, z;
+    } parcc_vec3;
+    parcc_context* context = (parcc_context*)userdata;
+    const parcc_vec3 minc = *((parcc_vec3*)context->config.content_aabb.min_corner);
+    const parcc_vec3 maxc = *((parcc_vec3*)context->config.content_aabb.max_corner);
+
+    // The front face is defined in CCW order and the back face is defined in CW order.
+    // Both start at the lower-left corner.
+
+    const parcc_float fr[4][3] = {
+        {minc.x, minc.y, maxc.z},
+        {maxc.x, minc.y, maxc.z},
+        {maxc.x, maxc.y, maxc.z},
+        {minc.x, maxc.y, maxc.z},
+    };
+
+    const parcc_float bk[4][3] = {
+        {minc.x, minc.y, minc.z},
+        {minc.x, maxc.y, minc.z},
+        {maxc.x, maxc.y, minc.z},
+        {maxc.x, minc.y, minc.z},
+    };
+
+    float u, v;
+
+    // Front
+    if (intersect_quad(origin, dir, fr[0], fr[1], fr[2], fr[3], t, &u, &v)) {
+        return true;
+    }
+
+    // Back
+    if (intersect_quad(origin, dir, bk[0], bk[1], bk[2], bk[3], t, &u, &v)) {
+        return true;
+    }
+
+    // Right
+    if (intersect_quad(origin, dir, fr[2], fr[1], bk[3], bk[2], t, &u, &v)) {
+        return true;
+    }
+
+    // Left
+    if (intersect_quad(origin, dir, fr[3], bk[1], bk[0], fr[0], t, &u, &v)) {
+        return true;
+    }
+
+    // Bottom
+    if (intersect_quad(origin, dir, bk[0], bk[3], fr[1], fr[0], t, &u, &v)) {
+        return true;
+    }
+
+    // Top
+    if (intersect_quad(origin, dir, bk[1], fr[3], fr[2], bk[2], t, &u, &v)) {
+        return true;
+    }
+
+    return false;
+}
+
+// Finds the point on the frustum's near plane that a pick ray intersects.
+static void parcc_get_ray_near(parcc_context* context, int winx, int winy, parcc_float result[3]) {
+    const parcc_float width = context->config.viewport_width;
+    const parcc_float height = context->config.viewport_height;
+    const parcc_float fov = context->config.fov_degrees * VEC_PI / 180.0;
+    const bool vertical_fov = context->config.fov_orientation == PARCC_VERTICAL;
+    const parcc_float* origin = context->eyepos;
+
+    parcc_float gaze[3];
+    float3_subtract(gaze, context->target, origin);
+    float3_normalize(gaze);
+
+    parcc_float right[3];
+    float3_cross(right, gaze, context->upward);
+    float3_normalize(right);
+
+    parcc_float upward[3];
+    float3_cross(upward, right, gaze);
+    float3_normalize(upward);
+
+    // Remap the grid coordinate into [-1, +1] and shift it to the pixel center.
+    const parcc_float u = 2.0 * (winx + 0.5) / width - 1.0;
+    const parcc_float v = 2.0 * (winy + 0.5) / height - 1.0;
+
+    // Compute the tangent of the field-of-view angle as well as the aspect ratio.
+    const parcc_float tangent = tan(fov / 2.0);
+    const parcc_float aspect = width / height;
+
+    // Adjust the gaze so it goes through the pixel of interest rather than the grid center.
+    if (vertical_fov) {
+        float3_scale(right, tangent * u * aspect);
+        float3_scale(upward, tangent * v);
+    } else {
+        float3_scale(right, tangent * u);
+        float3_scale(upward, tangent * v / aspect);
+    }
+    float3_add(gaze, gaze, right);
+    float3_add(gaze, gaze, upward);
+
+    // float3_scale(gaze, context->config.near_plane);
+
+    float3_add(result, origin, gaze);
+}
 
 #endif  // PAR_CAMERA_CONTROL_IMPLEMENTATION
 #endif  // PAR_CAMERA_CONTROL_H

@@ -9,8 +9,6 @@ do `make run`. For other platforms, simply invoke CMake in the way that you norm
 
 # TODO
 
-- works well when zoomed in but not zoomed out...precision issues? maybe q/p blows up.
-
 - fallback to a working_plane when the raycast fails...this might make more sense than the aabb
 
 - perfect zoom

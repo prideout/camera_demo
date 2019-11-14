@@ -180,13 +180,13 @@ struct parcc_context_s {
     parcc_float upward[3];
 
     bool grabbing;
-    parcc_float grab_point_near[3];
+    parcc_float grab_point_far[3];
     parcc_float grab_point_world[3];
     parcc_float grab_point_eyepos[3];
     parcc_float grab_point_target[3];
 };
 
-static void parcc_get_ray_near(parcc_context* context, int winx, int winy, parcc_float result[3]);
+static void parcc_get_ray_far(parcc_context* context, int winx, int winy, parcc_float result[3]);
 
 static bool parcc_raycast_aabb(const parcc_float origin[3], const parcc_float dir[3],
                                parcc_float* t, void* userdata);
@@ -241,42 +241,27 @@ void parcc_grab_begin(parcc_context* context, int winx, int winy) {
         puts("missed\n");
         return;
     }
-
-    printf("grabbed ");
-    float3_print(stdout, context->grab_point_world);
-    printf("\n");
-
     context->grabbing = true;
-    parcc_get_ray_near(context, winx, winy, context->grab_point_near);
+    parcc_get_ray_far(context, winx, winy, context->grab_point_far);
     float3_copy(context->grab_point_eyepos, context->eyepos);
     float3_copy(context->grab_point_target, context->target);
 }
 
-// This is similar to the diagram at:
-// https://stackoverflow.com/questions/12097693/3d-scene-panning-in-perspective-projection-opengl
-// Note however that the answers's last sentence is not quite correct.
-
 void parcc_grab_update(parcc_context* context, int winx, int winy, parcc_float scrolldelta) {
-    parcc_config cfg = context->config;
-    const parcc_float vpheight = context->eyepos[2] * 2.0 * tan(cfg.fov_degrees * VEC_PI / 360.0);
-    const parcc_float vpwidth = vpheight * cfg.viewport_width / cfg.viewport_height;
-    const parcc_float vpx = 2.0 * (float)winx / cfg.viewport_width - 1.0;
-    const parcc_float vpy = 2.0 * (float)winy / cfg.viewport_height - 1.0;
-
     parcc_float p_vec[3];
     float3_subtract(p_vec, context->grab_point_world, context->grab_point_eyepos);
     const parcc_float p_len = float3_length(p_vec);
 
     parcc_float q_vec[3];
-    float3_subtract(q_vec, context->grab_point_near, context->grab_point_eyepos);
+    float3_subtract(q_vec, context->grab_point_far, context->grab_point_eyepos);
     const parcc_float q_len = float3_length(q_vec);
 
-    parcc_float near_point[3];
-    parcc_get_ray_near(context, winx, winy, near_point);
+    parcc_float far_point[3];
+    parcc_get_ray_far(context, winx, winy, far_point);
 
     parcc_float translation[3];
-    float3_subtract(translation, near_point, context->grab_point_near);
-    float3_scale(translation, -1.0 / (q_len / p_len - 1.0));
+    float3_subtract(translation, far_point, context->grab_point_far);
+    float3_scale(translation, p_len / (2.0 * p_len - q_len));
 
     if (context->grabbing) {
         float3_add(context->eyepos, context->grab_point_eyepos, translation);
@@ -424,8 +409,8 @@ static bool parcc_raycast_aabb(const parcc_float origin[3], const parcc_float di
     return false;
 }
 
-// Finds the point on the frustum's near plane that a pick ray intersects.
-static void parcc_get_ray_near(parcc_context* context, int winx, int winy, parcc_float result[3]) {
+// Finds the point on the frustum's far plane that a pick ray intersects.
+static void parcc_get_ray_far(parcc_context* context, int winx, int winy, parcc_float result[3]) {
     const parcc_float width = context->config.viewport_width;
     const parcc_float height = context->config.viewport_height;
     const parcc_float fov = context->config.fov_degrees * VEC_PI / 180.0;
@@ -462,9 +447,7 @@ static void parcc_get_ray_near(parcc_context* context, int winx, int winy, parcc
     }
     float3_add(gaze, gaze, right);
     float3_add(gaze, gaze, upward);
-
-    // float3_scale(gaze, context->config.near_plane);
-
+    float3_scale(gaze, context->config.far_plane);
     float3_add(result, origin, gaze);
 }
 

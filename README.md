@@ -11,8 +11,6 @@ do `make run`. For other platforms, simply invoke CMake in the way that you norm
 
 - fallback to a working_plane when the raycast fails...this might make more sense than the aabb
 
-- perfect zoom
-
 - blog entry on the math
 
 - map mode

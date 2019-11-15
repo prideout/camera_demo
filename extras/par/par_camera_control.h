@@ -238,7 +238,7 @@ void parcc_get_matrix_view(const parcc_context* ctx, parcc_float view[16]) {
 
 void parcc_grab_begin(parcc_context* context, int winx, int winy) {
     if (!parcc_do_raycast(context, winx, winy, context->grab_point_world)) {
-        puts("missed\n");
+        puts("missed grab\n");
         return;
     }
     context->grabbing = true;
@@ -248,30 +248,44 @@ void parcc_grab_begin(parcc_context* context, int winx, int winy) {
 }
 
 void parcc_grab_update(parcc_context* context, int winx, int winy, parcc_float scrolldelta) {
-    parcc_float u_vec[3];
-    float3_subtract(u_vec, context->grab_point_world, context->grab_point_eyepos);
-    const parcc_float u_len = float3_length(u_vec);
-
-    parcc_float v_vec[3];
-    float3_subtract(v_vec, context->grab_point_far, context->grab_point_world);
-    const parcc_float v_len = float3_length(v_vec);
-
-    parcc_float far_point[3];
-    parcc_get_ray_far(context, winx, winy, far_point);
-
-    parcc_float translation[3];
-    float3_subtract(translation, far_point, context->grab_point_far);
-    float3_scale(translation, -u_len / v_len);
-
+    // Handle pan.
     if (context->grabbing) {
+        parcc_float u_vec[3];
+        float3_subtract(u_vec, context->grab_point_world, context->grab_point_eyepos);
+        const parcc_float u_len = float3_length(u_vec);
+
+        parcc_float v_vec[3];
+        float3_subtract(v_vec, context->grab_point_far, context->grab_point_world);
+        const parcc_float v_len = float3_length(v_vec);
+
+        parcc_float far_point[3];
+        parcc_get_ray_far(context, winx, winy, far_point);
+
+        parcc_float translation[3];
+        float3_subtract(translation, far_point, context->grab_point_far);
+        float3_scale(translation, -u_len / v_len);
         float3_add(context->eyepos, context->grab_point_eyepos, translation);
         float3_add(context->target, context->grab_point_target, translation);
     }
 
     // Handle zoom.
     if (scrolldelta != 0.0) {
-        // TODO
-        context->eyepos[2] -= scrolldelta * context->eyepos[2] * 0.01;  // TODO: kZoomSpeed
+        parcc_float grab_point_world[3];
+        if (!parcc_do_raycast(context, winx, winy, grab_point_world)) {
+            puts("missed zoom");
+            return;
+        }
+
+        parcc_float grab_point_far[3];
+        parcc_get_ray_far(context, winx, winy, grab_point_far);
+
+        parcc_float u_vec[3];
+        float3_subtract(u_vec, grab_point_world, context->eyepos);
+
+        const float kZoomSpeed = 0.01;
+        float3_scale(u_vec, scrolldelta * kZoomSpeed);
+        float3_add(context->eyepos, context->eyepos, u_vec);
+        float3_add(context->target, context->target, u_vec);
     }
 }
 

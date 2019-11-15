@@ -248,20 +248,20 @@ void parcc_grab_begin(parcc_context* context, int winx, int winy) {
 }
 
 void parcc_grab_update(parcc_context* context, int winx, int winy, parcc_float scrolldelta) {
-    parcc_float p_vec[3];
-    float3_subtract(p_vec, context->grab_point_world, context->grab_point_eyepos);
-    const parcc_float p_len = float3_length(p_vec);
+    parcc_float u_vec[3];
+    float3_subtract(u_vec, context->grab_point_world, context->grab_point_eyepos);
+    const parcc_float u_len = float3_length(u_vec);
 
-    parcc_float q_vec[3];
-    float3_subtract(q_vec, context->grab_point_far, context->grab_point_eyepos);
-    const parcc_float q_len = float3_length(q_vec);
+    parcc_float v_vec[3];
+    float3_subtract(v_vec, context->grab_point_far, context->grab_point_world);
+    const parcc_float v_len = float3_length(v_vec);
 
     parcc_float far_point[3];
     parcc_get_ray_far(context, winx, winy, far_point);
 
     parcc_float translation[3];
     float3_subtract(translation, far_point, context->grab_point_far);
-    float3_scale(translation, p_len / (2.0 * p_len - q_len));
+    float3_scale(translation, -u_len / v_len);
 
     if (context->grabbing) {
         float3_add(context->eyepos, context->grab_point_eyepos, translation);

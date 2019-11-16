@@ -92,7 +92,8 @@ typedef struct {
     parcc_float far_plane;
     parcc_fov fov_orientation;
     parcc_float fov_degrees;
-    parcc_aabb content_aabb;
+    parcc_aabb orbit_aabb;
+    parcc_float map_plane[4];
     parcc_raycast_fn raycast_function;
     void* raycast_userdata;
 } parcc_config;
@@ -191,11 +192,14 @@ static void parcc_get_ray_far(parcc_context* context, int winx, int winy, parcc_
 static bool parcc_raycast_aabb(const parcc_float origin[3], const parcc_float dir[3],
                                parcc_float* t, void* userdata);
 
+static bool parcc_raycast_plane(const parcc_float origin[3], const parcc_float dir[3],
+                                parcc_float* t, void* userdata);
+
 parcc_context* parcc_create_context(parcc_config config) {
     parcc_context* context = PAR_CALLOC(parcc_context, 1);
     context->config = config;
     parcc_float center[3];
-    float3_lerp(center, config.content_aabb.min_corner, config.content_aabb.max_corner, 0.5);
+    float3_lerp(center, config.orbit_aabb.min_corner, config.orbit_aabb.max_corner, 0.5);
     float3_set(context->eyepos, center[0], center[1], 2);  // TODO: compute initial distance
     float3_set(context->target, center[0], center[1], 0);
     float3_set(context->upward, 0, 1, 0);
@@ -330,17 +334,25 @@ bool parcc_do_raycast(parcc_context* context, int winx, int winy, parcc_float re
     float3_add(gaze, gaze, upward);
     float3_normalize(gaze);
 
-    // Invoke the user's callback or fallback to our AABB intersector.
+    // Invoke the user's callback or fallback function.
     parcc_raycast_fn callback = context->config.raycast_function;
+    parcc_raycast_fn fallback =
+        context->config.mode == PARCC_ORBIT ? parcc_raycast_aabb : parcc_raycast_plane;
     void* userdata = context->config.raycast_userdata;
     if (!callback) {
-        callback = parcc_raycast_aabb;
+        callback = fallback;
         userdata = context;
     }
 
+    // If the ray misses, then try the fallback function.
     parcc_float t;
     if (!callback(origin, gaze, &t, userdata)) {
-        return false;
+        if (callback == fallback) {
+            return false;
+        }
+        if (!fallback(origin, gaze, &t, context)) {
+            return false;
+        }
     }
 
     float3_scale(gaze, t);
@@ -368,8 +380,8 @@ static bool parcc_raycast_aabb(const parcc_float origin[3], const parcc_float di
         parcc_float x, y, z;
     } parcc_vec3;
     parcc_context* context = (parcc_context*)userdata;
-    const parcc_vec3 minc = *((parcc_vec3*)context->config.content_aabb.min_corner);
-    const parcc_vec3 maxc = *((parcc_vec3*)context->config.content_aabb.max_corner);
+    const parcc_vec3 minc = *((parcc_vec3*)context->config.orbit_aabb.min_corner);
+    const parcc_vec3 maxc = *((parcc_vec3*)context->config.orbit_aabb.max_corner);
 
     // The front face is defined in CCW order and the back face is defined in CW order.
     // Both start at the lower-left corner.
@@ -420,6 +432,27 @@ static bool parcc_raycast_aabb(const parcc_float origin[3], const parcc_float di
         return true;
     }
 
+    return false;
+}
+
+static bool parcc_raycast_plane(const parcc_float origin[3], const parcc_float dir[3],
+                                parcc_float* t, void* userdata) {
+    typedef struct parcc_vec3 {
+        parcc_float x, y, z;
+    } parcc_vec3;
+    parcc_context* context = (parcc_context*)userdata;
+    const parcc_float* plane = context->config.map_plane;
+    parcc_vec3 n = {plane[0], plane[1], plane[2]};
+    parcc_vec3 p0 = n;
+    float3_scale(&p0.x, plane[3]);
+    float3_normalize(&n.x);
+    const parcc_float denom = -float3_dot(&n.x, dir);
+    if (denom > 1e-6) {
+        parcc_vec3 p0l0;
+        float3_subtract(&p0l0.x, &p0.x, origin);
+        *t = float3_dot(&p0l0.x, &n.x) / -denom;
+        return *t >= 0;
+    }
     return false;
 }
 

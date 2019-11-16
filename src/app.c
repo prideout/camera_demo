@@ -192,7 +192,8 @@ void app_init(App* app) {
         .far_plane = kFarPlane,
         .fov_orientation = PARCC_HORIZONTAL,
         .fov_degrees = kFov,
-        .content_aabb = aabb,
+        .orbit_aabb = aabb,
+        .map_plane = {0, 0, 1, 0},
         .raycast_function = app_intersects_mesh,
         .raycast_userdata = (void*)app,
     };

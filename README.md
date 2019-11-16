@@ -9,21 +9,16 @@ do `make run`. For other platforms, simply invoke CMake in the way that you norm
 
 # TODO
 
-- fallback to a working_plane when the raycast fails...this might make more sense than the aabb
-
-- blog entry on the math
-
 - map mode
-    - Ensure that maps need not be on the Z plane. (working_plane)
-    - navigation and animation (frames)
     - zoom and pan constraints (make it optional, add a checkbox)
+    - navigation and animation (frames)
     - proper home position
+    - "show frame"
 
 - orbit mode
-- "show frame"
+    - I think the aabb should be replaced with a fallback sphere
+
 - two emscripten demos (no microui stuff, probably)
-- multi-touch to zoom
-- slider for exaggerating mountains?
 
 # Docs branch
 
@@ -39,6 +34,7 @@ do `make run`. For other platforms, simply invoke CMake in the way that you norm
 
 # Longer term ideas
 
+- Multi-touch support, especially for zoom.
 - Consider adding FREE mode that changes the look-at vectors directly (forward / backward etc)
 - Demonstrate precision crosshairs for deep zoom, similar to my old blog post.
 - Make a demo that has a "view cube" as seen in tinkercad. See `ImGuizmo` for inspiration.

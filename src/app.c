@@ -184,18 +184,26 @@ void app_init(App* app) {
         {app->max_corner[0], app->max_corner[1], app->max_corner[2]},
     };
 
+    const parcc_float extent[2] = {
+        app->max_corner[0] - app->min_corner[0],
+        app->max_corner[1] - app->min_corner[1],
+    };
+
+    parcc_float center[3];
+    float3_lerp(center, aabb.min_corner, aabb.max_corner, 0.5);
+
     const parcc_config config = {
         .mode = PARCC_MAP,
         .viewport_width = sapp_width() - kSidebarWidth,
         .viewport_height = sapp_height(),
         .near_plane = kNearPlane,
         .far_plane = kFarPlane,
+        .map_extent = {extent[0], extent[1]},
         .fov_orientation = PARCC_HORIZONTAL,
-        .fov_degrees = kFov,
-        .orbit_aabb = aabb,
-        .map_plane = {0, 0, 1, 0},
         .raycast_function = app_intersects_mesh,
         .raycast_userdata = (void*)app,
+        .home_target = {center[0], center[1], 0},
+        .orbit_aabb = aabb,
     };
     app->camera_controller = parcc_create_context(config);
 
@@ -289,7 +297,7 @@ void app_start_camera_transition(App* app) {
     }
     app->transition.start_time = stm_sec(stm_now());
     app->transition.source = parcc_get_current_frame(app->camera_controller);
-    app->transition.target = parcc_get_home_frame(app->camera_controller, 10.0);
+    app->transition.target = parcc_get_home_frame(app->camera_controller);
     app->transition.van_wijk = true;
 }
 

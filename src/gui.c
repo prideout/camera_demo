@@ -114,11 +114,24 @@ static void define_ui(Gui* gui) {
     mu_checkbox(ctx, &raycast, "Raycast with mesh for precise zoom / pan");
     config.raycast_function = raycast ? app_intersects_mesh : NULL;
 
+    parcc_float eyepos[3];
+    parcc_float target[3];
+    parcc_float upward[3];
+    parcc_get_look_at(app->camera_controller, eyepos, target, upward);
+
+    char buf[128];
+    mu_layout_row(ctx, 1, (int[]){-1}, 0);
+    snprintf(buf, 128, "Camera position: %.03g, %.03g, %.03g", eyepos[0], eyepos[1], eyepos[2]);
+    ctx->style->colors[MU_COLOR_TEXT] = kInfoTextColor;
+    mu_label(ctx, buf);
+    ctx->style->colors[MU_COLOR_TEXT] = kActiveColor;
+
+    // blank area
     mu_layout_row(ctx, 1, (int[]){-1}, -82);
     mu_label(ctx, "");
 
+    // bottom pane
     mu_layout_row(ctx, 1, (int[]){-1}, 0);
-
     mu_button(ctx, "Go to Home Frame");
 
     mu_layout_row(ctx, 3, (int[]){93, 93, 93}, 0);

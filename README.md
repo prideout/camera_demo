@@ -9,14 +9,24 @@ do `make run`. For other platforms, simply invoke CMake in the way that you norm
 
 # TODO
 
-- map mode
-    - zoom and pan constraints (make it optional, add a checkbox)
-    - navigation and animation (frames)
-    - proper home position
-    - "show frame"
+- implement parcc_get_home_frame and parcc_set_frame
+
+- the "go to home position" button (instant for now)
+
+- map constraints
+
+- I guess the config should not be passed by value. (play with coliru?)
+
+- navigation and animation (frames)
+    - I think we should remove tick() and consolidate the two matrix getters
+
+- "show frame"
 
 - orbit mode
     - I think the aabb should be replaced with a fallback sphere
+
+- parcc_frame should perhaps be an opaque structure
+    - could be a 4-tuple of floats (mode + 3 data fields)
 
 - two emscripten demos (no microui stuff, probably)
 

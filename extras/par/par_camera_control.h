@@ -7,16 +7,16 @@
 // platform. In a sense, this is just a math library.
 //
 // When the controller is in ORBIT mode, it allows users to move the camera longitudinally or
-// latitudinally, but does not allow for tilting the "up" vector. The idea behind this constraint is
-// that people rarely crook their heads sideways when examining 3D objects. By design, quaternions
-// are not used. Instead the orientation of the camera is defined by a Y-axis rotation followed by
+// latitudinally, but does not allow for tilting the "up" vector. The rationale is that people
+// rarely crook their heads sideways when examining 3D objects. Quaternions are great, but they are
+// avoided here! Instead the orientation of the camera is defined by a Y-axis rotation followed by
 // an X-axis rotation.
 //
 // Clients can also use this to implement "spin the object" functionality rather than "orbit the
 // camera", but the latter is what I designed it for. The library takes a raycast callback to
 // support precise grabbing behavior. If this is not required for your use case (e.g. a top-down
 // terrain with an orthgraphic projection), provide NULL for the callback and the library will
-// simply raycast against the axis-aligned bounding box that you provide.
+// simply raycast against the plane equation that you provide.
 //
 //   #define PAR_CAMERA_CONTROL_IMPLEMENTATION
 //   #include "par_camera_control.h"
@@ -53,8 +53,8 @@ extern "C" {
 #define parcc_float float
 #endif
 
-// The camera controller can be configured using either a VERTICAL or HORIZONTAL field of view. This
-// specifies which of the two FOV angles should be held constant. For example, if you use a
+// The camera controller can be configured using either a VERTICAL or HORIZONTAL field of view.
+// This specifies which of the two FOV angles should be held constant. For example, if you use a
 // horizontal FOV, shrinking the viewport width will change the height of the frustum, but will
 // leave the frustum width intact.
 typedef enum {
@@ -62,18 +62,22 @@ typedef enum {
     PARCC_HORIZONTAL,
 } parcc_fov;
 
-// The controller can be configured in orbit mode or pan-and-zoom mode. The mode can be changed at
-// run time, in which case the controller will smoothly animate to a common "home" position.
+// The controller can be configured in orbit mode or pan-and-zoom mode.
 typedef enum {
     PARCC_ORBIT,  // aka tumble, trackball, or arcball
     PARCC_MAP,    // pan and zoom like Google Maps
 } parcc_mode;
 
-// Captured camera state (in world-space) used for Van Wijk animation in MAP mode.
+// Captured camera state used solely for animation.
 typedef struct {
-    parcc_float extent;  // This is either width or height, depending on fov_orientation.
-    parcc_float center_x;
-    parcc_float center_y;
+    // Van Wijk parameters for MAP mode.
+    parcc_float extent;     // world-space width or height, depending on fov_orientation.
+    parcc_float center[2];  // vector from home_target that gets projected to map_plane.
+
+    // Radius and euler angles for ORBIT mode. Nope, does not use quaternions.
+    parcc_float radius;  // world-space distance between home_target and camera
+    parcc_float theta;   // Y axis rotation (applied first)
+    parcc_float phi;     // X axis rotation (applied second)
 } parcc_frame;
 
 typedef struct {
@@ -81,21 +85,41 @@ typedef struct {
     parcc_float max_corner[3];
 } parcc_aabb;
 
+typedef struct {
+    parcc_float min_value;
+    parcc_float max_value;
+} parcc_range;
+
 typedef bool (*parcc_raycast_fn)(const parcc_float origin[3], const parcc_float dir[3],
                                  parcc_float* t, void* userdata);
 
+// The config structure represents all user-controlled state in the library.
+// The first few fields must be provided, but all remaining fields fall back to reasonable default
+// values when they are zero-filled.
 typedef struct {
-    parcc_mode mode;
-    int viewport_width;
-    int viewport_height;
-    parcc_float near_plane;
-    parcc_float far_plane;
-    parcc_fov fov_orientation;
-    parcc_float fov_degrees;
-    parcc_aabb orbit_aabb;
-    parcc_float map_plane[4];
-    parcc_raycast_fn raycast_function;
-    void* raycast_userdata;
+    parcc_mode mode;            // must be PARCC_ORBIT or PARCC_MAP
+    int viewport_width;         // horizontal extent in pixels
+    int viewport_height;        // vertical extent in pixels
+    parcc_float near_plane;     // distance between camera and near clipping plane
+    parcc_float far_plane;      // distance between camera and far clipping plane
+    parcc_float map_extent[2];  // constraints for map_plane (centered at home_target)
+
+    parcc_fov fov_orientation;  // defaults to PARCC_VERTICAL
+    parcc_float fov_degrees;    // defaults to 33
+    parcc_float zoom_speed;     // defaults to 0.01
+
+    parcc_raycast_fn raycast_function;  // defaults to plane & sphere intersectors
+    void* raycast_userdata;             // arbitrary data for the raycast callback
+
+    parcc_float home_target[3];  // defaults to (0,0,0)
+    parcc_float home_upward[3];  // defaults to (0,1,0)
+    parcc_float home_gaze[3];    // defaults to (0,0,-1)
+
+    parcc_float map_plane[4];  // plane equation, defaults to (0,0,1,0)
+
+    parcc_aabb orbit_aabb;                       // TODO: replace with sphere
+    parcc_range orbit_constraint_theta_degrees;  // Y axis rotation, defaults to [-inf,+inf]
+    parcc_range orbit_constraint_phi_degrees;    // X axis rotation, defaults to [-89, +89]
 } parcc_config;
 
 // Opaque handle to a camera controller and its memory arena.
@@ -128,7 +152,7 @@ bool parcc_do_raycast(parcc_context* context, int winx, int winy, parcc_float re
 
 // Frames (captured controller states) and Van Wijk interpolation functions.
 parcc_frame parcc_get_current_frame(const parcc_context* context);
-parcc_frame parcc_get_home_frame(const parcc_context* context, parcc_float margin);
+parcc_frame parcc_get_home_frame(const parcc_context* context);
 void parcc_set_frame(parcc_context* context, parcc_frame state);
 parcc_frame parcc_interpolate_frames(parcc_frame a, parcc_frame b, double t);
 double parcc_get_interpolation_duration(parcc_frame a, parcc_frame b);
@@ -197,18 +221,42 @@ static bool parcc_raycast_plane(const parcc_float origin[3], const parcc_float d
 
 parcc_context* parcc_create_context(parcc_config config) {
     parcc_context* context = PAR_CALLOC(parcc_context, 1);
-    context->config = config;
-    parcc_float center[3];
-    float3_lerp(center, config.orbit_aabb.min_corner, config.orbit_aabb.max_corner, 0.5);
-    float3_set(context->eyepos, center[0], center[1], 2);  // TODO: compute initial distance
-    float3_set(context->target, center[0], center[1], 0);
-    float3_set(context->upward, 0, 1, 0);
+    parcc_set_config(context, config);
+    parcc_set_frame(context, parcc_get_home_frame(context));
     return context;
 }
 
 parcc_config parcc_get_config(const parcc_context* context) { return context->config; }
 
-void parcc_set_config(parcc_context* context, parcc_config config) { context->config = config; }
+void parcc_set_config(parcc_context* context, parcc_config config) {
+    if (config.fov_degrees == 0) {
+        config.fov_degrees = 33;
+    }
+    if (config.zoom_speed == 0) {
+        config.zoom_speed = 0.01;
+    }
+    if (float3_dot(config.home_gaze, config.home_gaze) == 0) {
+        config.home_gaze[2] = -1;
+    }
+    if (float3_dot(config.home_upward, config.home_upward) == 0) {
+        config.home_upward[1] = 1;
+    }
+    if (float4_dot(config.map_plane, config.map_plane) == 0) {
+        config.map_plane[2] = 1;
+    }
+
+    parcc_range* theta = &config.orbit_constraint_theta_degrees;
+    if (theta->min_value == 0 && theta->max_value == 0) {
+        *theta = (parcc_range){-INFINITY, INFINITY};
+    }
+
+    parcc_range* phi = &config.orbit_constraint_phi_degrees;
+    if (phi->min_value == 0 && phi->max_value == 0) {
+        *phi = (parcc_range){-89, +89};
+    }
+
+    context->config = config;
+}
 
 void parcc_destroy_context(parcc_context* context) { PAR_FREE(context); }
 
@@ -283,11 +331,19 @@ void parcc_grab_update(parcc_context* context, int winx, int winy, parcc_float s
         parcc_float grab_point_far[3];
         parcc_get_ray_far(context, winx, winy, grab_point_far);
 
+        // We intentionally avoid normalizing this vector since you usually
+        // want to slow down when approaching the surface.
         parcc_float u_vec[3];
         float3_subtract(u_vec, grab_point_world, context->eyepos);
 
-        const float kZoomSpeed = 0.01;
-        float3_scale(u_vec, scrolldelta * kZoomSpeed);
+        // Do not zoom in too far (this prevents getting stuck).
+        const parcc_float zoom_speed = context->config.zoom_speed;
+        const parcc_float u_len = float3_length(u_vec);
+        if (u_len < zoom_speed && scrolldelta > 0.0) {
+            return;
+        }
+
+        float3_scale(u_vec, scrolldelta * zoom_speed);
         float3_add(context->eyepos, context->eyepos, u_vec);
         float3_add(context->target, context->target, u_vec);
     }
@@ -362,11 +418,22 @@ bool parcc_do_raycast(parcc_context* context, int winx, int winy, parcc_float re
 
 parcc_frame parcc_get_current_frame(const parcc_context* context) { return context->current_frame; }
 
-parcc_frame parcc_get_home_frame(const parcc_context* context, parcc_float margin) {
+parcc_frame parcc_get_home_frame(const parcc_context* context) {
+    // TODO
     return (parcc_frame){0};
 }
 
-void parcc_set_frame(parcc_context* context, parcc_frame frame) { context->current_frame = frame; }
+void parcc_set_frame(parcc_context* context, parcc_frame frame) {
+    // TODO
+    context->current_frame = frame;
+    if (context->config.mode == PARCC_MAP) {
+        const parcc_float* center = context->config.home_target;
+        const parcc_float* upward = context->config.home_upward;
+        float3_set(context->eyepos, center[0], center[1], 2);
+        float3_copy(context->target, center);
+        float3_copy(context->upward, upward);
+    }
+}
 
 parcc_frame parcc_interpolate_frames(parcc_frame a, parcc_frame b, double t) {
     return (parcc_frame){0};

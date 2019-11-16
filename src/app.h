@@ -11,7 +11,6 @@
 #include "gui.h"
 
 #define kSidebarWidth (300)
-#define kFov (33)
 #define kNearPlane (0.01)
 #define kFarPlane (100)
 

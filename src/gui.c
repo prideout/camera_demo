@@ -227,9 +227,6 @@ bool gui_handle(Gui* gui, const sapp_event* ev) {
             if (key == 'g') {
                 app_start_camera_transition(gui->app);
             }
-            if (key == 'r') {
-                app_start_raytrace(gui->app);
-            }
             break;
         }
         default:

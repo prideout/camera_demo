@@ -10,7 +10,6 @@
 
 #include <stb/stb_image.h>
 #include <stb/stb_image_resize.h>
-#include <stb/stb_image_write.h>
 
 #include <sokol/sokol_gfx.h>
 #include <sokol/sokol_time.h>
@@ -299,28 +298,4 @@ void app_start_camera_transition(App* app) {
     app->transition.source = parcc_get_current_frame(app->camera_controller);
     app->transition.target = parcc_get_home_frame(app->camera_controller);
     app->transition.van_wijk = true;
-}
-
-void app_start_raytrace(App* app) {
-    const int vpwidth = sapp_width() - kSidebarWidth;
-    const int vpheight = sapp_height();
-    uint8_t* image = calloc(vpwidth * vpheight, 1);
-    float world_space[3];
-    const float maxz = app->max_corner[2];
-    const float minz = app->min_corner[2];
-    const float invz = 1.0 / (maxz - minz);
-    puts("Starting raytrace...");
-    for (int winy = 0; winy < vpheight; winy += 2) {
-        printf("%d\n", vpheight - winy);
-        for (int winx = 0; winx < vpwidth; winx += 2) {
-            if (parcc_do_raycast(app->camera_controller, winx, winy, world_space)) {
-                const float z = (world_space[2] - minz) * invz;
-                image[winy * vpwidth + winx] = 255.0f * z;
-            }
-        }
-    }
-    puts("Done.");
-    stbi_flip_vertically_on_write(1);
-    stbi_write_png("raytraced.png", vpwidth, vpheight, 1, image, vpwidth);
-    free(image);
 }

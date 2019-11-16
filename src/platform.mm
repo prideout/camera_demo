@@ -5,7 +5,6 @@
 #define PAR_MSQUARES_IMPLEMENTATION
 #define STB_IMAGE_RESIZE_IMPLEMENTATION
 #define STB_IMAGE_IMPLEMENTATION
-#define STB_IMAGE_WRITE_IMPLEMENTATION
 #define STBI_ONLY_PNG
 #define NANO_RT_C_IMPLEMENTATION
 
@@ -18,6 +17,5 @@
 
 #include <stb/stb_image.h>
 #include <stb/stb_image_resize.h>
-#include <stb/stb_image_write.h>
 
 #include <nanort/nanort_c.h>

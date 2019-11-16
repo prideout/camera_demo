@@ -53,6 +53,5 @@ typedef struct App {
 void app_init(App* app);
 void app_draw(App* app);
 void app_start_camera_transition(App* app);
-void app_start_raytrace(App* app);
 
 bool app_intersects_mesh(const float origin[3], const float dir[3], float* t, void* userdata);

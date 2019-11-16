@@ -97,25 +97,24 @@ typedef bool (*parcc_raycast_fn)(const parcc_float origin[3], const parcc_float 
 // The first few fields must be provided, but all remaining fields fall back to reasonable default
 // values when they are zero-filled.
 typedef struct {
-    parcc_mode mode;            // must be PARCC_ORBIT or PARCC_MAP
-    int viewport_width;         // horizontal extent in pixels
-    int viewport_height;        // vertical extent in pixels
-    parcc_float near_plane;     // distance between camera and near clipping plane
-    parcc_float far_plane;      // distance between camera and far clipping plane
+    parcc_mode mode;         // must be PARCC_ORBIT or PARCC_MAP
+    int viewport_width;      // horizontal extent in pixels
+    int viewport_height;     // vertical extent in pixels
+    parcc_float near_plane;  // distance between camera and near clipping plane
+    parcc_float far_plane;   // distance between camera and far clipping plane
+
     parcc_float map_extent[2];  // constraints for map_plane (centered at home_target)
+    parcc_float map_plane[4];   // plane equation with normalized XYZ, defaults to (0,0,1,0)
 
     parcc_fov fov_orientation;  // defaults to PARCC_VERTICAL
-    parcc_float fov_degrees;    // defaults to 33
+    parcc_float fov_degrees;    // full field-of-view angle (not half-angle), defaults to 33.
     parcc_float zoom_speed;     // defaults to 0.01
 
     parcc_raycast_fn raycast_function;  // defaults to plane & sphere intersectors
     void* raycast_userdata;             // arbitrary data for the raycast callback
 
-    parcc_float home_target[3];  // defaults to (0,0,0)
-    parcc_float home_upward[3];  // defaults to (0,1,0)
-    parcc_float home_gaze[3];    // defaults to (0,0,-1)
-
-    parcc_float map_plane[4];  // plane equation, defaults to (0,0,1,0)
+    parcc_float home_target[3];  // world-space coordinate, defaults to (0,0,0)
+    parcc_float home_upward[3];  // unit-length vector, defaults to (0,1,0)
 
     parcc_aabb orbit_aabb;                       // TODO: replace with sphere
     parcc_range orbit_constraint_theta_degrees;  // Y axis rotation, defaults to [-inf,+inf]
@@ -234,9 +233,6 @@ void parcc_set_config(parcc_context* context, parcc_config config) {
     }
     if (config.zoom_speed == 0) {
         config.zoom_speed = 0.01;
-    }
-    if (float3_dot(config.home_gaze, config.home_gaze) == 0) {
-        config.home_gaze[2] = -1;
     }
     if (float3_dot(config.home_upward, config.home_upward) == 0) {
         config.home_upward[1] = 1;
@@ -419,18 +415,31 @@ bool parcc_do_raycast(parcc_context* context, int winx, int winy, parcc_float re
 parcc_frame parcc_get_current_frame(const parcc_context* context) { return context->current_frame; }
 
 parcc_frame parcc_get_home_frame(const parcc_context* context) {
-    // TODO
-    return (parcc_frame){0};
+    parcc_frame result;
+    if (context->config.mode == PARCC_MAP) {
+        const bool horiz = context->config.fov_orientation == PARCC_HORIZONTAL;
+        result.extent = horiz ? context->config.map_extent[0] : context->config.map_extent[1];
+        result.center[0] = 0;
+        result.center[1] = 0;
+    }
+    return result;
 }
 
 void parcc_set_frame(parcc_context* context, parcc_frame frame) {
-    // TODO
     context->current_frame = frame;
     if (context->config.mode == PARCC_MAP) {
-        const parcc_float* center = context->config.home_target;
+        const parcc_float* target = context->config.home_target;
         const parcc_float* upward = context->config.home_upward;
-        float3_set(context->eyepos, center[0], center[1], 2);
-        float3_copy(context->target, center);
+        const parcc_float half_extent = frame.extent / 2.0;
+        const parcc_float fov = context->config.fov_degrees * VEC_PI / 180.0;
+        const parcc_float distance = half_extent / tan(fov / 2);
+
+        parcc_float target_to_eye[3];
+        float3_copy(target_to_eye, context->config.map_plane);
+        float3_scale(target_to_eye, distance);
+
+        float3_add(context->eyepos, target, target_to_eye);
+        float3_copy(context->target, target);
         float3_copy(context->upward, upward);
     }
 }
@@ -512,7 +521,6 @@ static bool parcc_raycast_plane(const parcc_float origin[3], const parcc_float d
     parcc_vec3 n = {plane[0], plane[1], plane[2]};
     parcc_vec3 p0 = n;
     float3_scale(&p0.x, plane[3]);
-    float3_normalize(&n.x);
     const parcc_float denom = -float3_dot(&n.x, dir);
     if (denom > 1e-6) {
         parcc_vec3 p0l0;

@@ -9,9 +9,9 @@ do `make run`. For other platforms, simply invoke CMake in the way that you norm
 
 # TODO
 
-- implement parcc_get_home_frame and parcc_set_frame
+- at least trim the terrain!
 
-- the "go to home position" button (instant for now)
+- the save / load frame buttons
 
 - map constraints
 

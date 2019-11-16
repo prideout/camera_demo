@@ -80,6 +80,7 @@ static void mux_radio_buttons(mu_Context* ctx, int* val, mux_Button a, mux_Butto
 static void define_ui(Gui* gui) {
     mu_Context* ctx = &gui->ctx;
     App* app = gui->app;
+    parcc_context* camera = app->camera_controller;
     mu_begin(ctx);
 
     if (!gui->window.inited) {
@@ -93,7 +94,7 @@ static void define_ui(Gui* gui) {
     mu_begin_window_ex(ctx, &gui->window, "", MU_OPT_NOTITLE | MU_OPT_NORESIZE);
 
     static parcc_config config;
-    config = parcc_get_config(app->camera_controller);
+    config = parcc_get_config(camera);
 
     mu_layout_row(ctx, 2, (int[]){142, -1}, 0);
 
@@ -117,7 +118,7 @@ static void define_ui(Gui* gui) {
     parcc_float eyepos[3];
     parcc_float target[3];
     parcc_float upward[3];
-    parcc_get_look_at(app->camera_controller, eyepos, target, upward);
+    parcc_get_look_at(camera, eyepos, target, upward);
 
     char buf[128];
     mu_layout_row(ctx, 1, (int[]){-1}, 0);
@@ -132,7 +133,9 @@ static void define_ui(Gui* gui) {
 
     // bottom pane
     mu_layout_row(ctx, 1, (int[]){-1}, 0);
-    mu_button(ctx, "Go to Home Frame");
+    if (mu_button(ctx, "Go to Home Frame")) {
+        parcc_set_frame(camera, parcc_get_home_frame(camera));
+    }
 
     mu_layout_row(ctx, 3, (int[]){93, 93, 93}, 0);
     mu_button(ctx, "Save Frame A");
@@ -149,7 +152,7 @@ static void define_ui(Gui* gui) {
 
     mu_end_window(ctx);
 
-    parcc_set_config(app->camera_controller, config);
+    parcc_set_config(camera, config);
     mu_end(ctx);
 }
 

@@ -14,7 +14,8 @@ out float vdepth;
 void main() {
   gl_Position = projection * modelview * position;
   vnormal = (mat3(inverse_modelview) * normal).xyz;
-  vuv = position.xy * vec2(1.0, 3.0);
+  const float aspect = 3200.0 / 1333.0;
+  vuv = position.xy * vec2(1.0, aspect);
   vdepth = position.z;
 }
 

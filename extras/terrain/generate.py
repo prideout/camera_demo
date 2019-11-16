@@ -5,9 +5,16 @@ import snowy
 import numpy as np
 from scipy import interpolate
 
-width, height = 6000, 2000
+width, height = 8000, 2666
 warpx, warpy = height / 10, height / 10
 falloff_stretch = (0.5, 1.1)
+
+
+# resize the image and remove some stuff from the left and right edges.
+def trim(img):
+    img = snowy.resize(img, width=4000)
+    img = img[:, 300:3500, :]
+    return img
 
 
 def generate_fBm(width, height, freq, layers, wrapx=False, wrapy=False):
@@ -60,7 +67,7 @@ normals = snowy.resize(snowy.compute_normals(elevation), width, height)
 
 # Save the landmass portion of the elevation data.
 landmass = elevation * np.where(elevation < 0.0, 0.0, 1.0)
-snowy.save(landmass, "landmass.png")
+snowy.save(trim(landmass), "landmass.png")
 
 # Flatten the normals according to landmass versus sea.
 normals += np.float64([0, 0, 1000]) * np.where(elevation < 0.0, 1.0, 0.01)
@@ -83,5 +90,4 @@ albedo = apply_lut(snowy.unshape(el))
 
 print("Saving to disk.")
 final = albedo * lighting
-snowy.save(final, "terrain.png")
-snowy.show(final)
+snowy.save(trim(final), "terrain.png")

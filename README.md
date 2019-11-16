@@ -9,24 +9,22 @@ do `make run`. For other platforms, simply invoke CMake in the way that you norm
 
 # TODO
 
-- at least trim the terrain!
-
-- the save / load frame buttons
+- Save / Go To buttons
 
 - map constraints
-
-- I guess the config should not be passed by value. (play with coliru?)
 
 - navigation and animation (frames)
     - I think we should remove tick() and consolidate the two matrix getters
 
-- "show frame"
+- "Show frame" buttons
 
 - orbit mode
     - I think the aabb should be replaced with a fallback sphere
 
-- parcc_frame should perhaps be an opaque structure
-    - could be a 4-tuple of floats (mode + 3 data fields)
+- more API cleanup
+    - parcc_frame should perhaps be an opaque structure
+        - could be a 4-tuple of floats (mode + 3 data fields) that gets casted to 1 of 2 types
+    - I guess the config should not be passed by value. (play with coliru?)
 
 - two emscripten demos (no microui stuff, probably)
 

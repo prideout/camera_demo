@@ -46,6 +46,8 @@ typedef struct App {
     Gui* gui;
     par_msquares_mesh const* mesh;
     part_context* raytracer;
+    bool has_frame[2];
+    parcc_frame saved_frame[2];
     float min_corner[3];
     float max_corner[3];
 } App;
@@ -53,5 +55,9 @@ typedef struct App {
 void app_init(App* app);
 void app_draw(App* app);
 void app_start_camera_transition(App* app);
+
+void app_goto_frame(App* app, int index);
+void app_save_frame(App* app, int index);
+void app_show_frame(App* app, int index);
 
 bool app_intersects_mesh(const float origin[3], const float dir[3], float* t, void* userdata);

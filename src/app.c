@@ -299,3 +299,18 @@ void app_start_camera_transition(App* app) {
     app->transition.target = parcc_get_home_frame(app->camera_controller);
     app->transition.van_wijk = true;
 }
+
+void app_goto_frame(App* app, int index) {
+    if (app->has_frame[index]) {
+        parcc_set_frame(app->camera_controller, app->saved_frame[index]);
+    }
+}
+
+void app_save_frame(App* app, int index) {
+    app->saved_frame[index] = parcc_get_current_frame(app->camera_controller);
+    app->has_frame[index] = true;
+}
+
+void app_show_frame(App* app, int index) {
+    // TODO: show the frame as a vertical or horizontal bar, then fade it out.
+}

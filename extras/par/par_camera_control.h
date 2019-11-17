@@ -196,7 +196,6 @@ double parcc_get_interpolation_duration(parcc_frame a, parcc_frame b);
 
 struct parcc_context_s {
     parcc_config config;
-    parcc_frame current_frame;
     parcc_float projection[16];
     parcc_float viewmatrix[16];
     parcc_float eyepos[3];
@@ -412,7 +411,43 @@ bool parcc_do_raycast(parcc_context* context, int winx, int winy, parcc_float re
     return true;
 }
 
-parcc_frame parcc_get_current_frame(const parcc_context* context) { return context->current_frame; }
+parcc_frame parcc_get_current_frame(const parcc_context* context) {
+    parcc_frame result = {0};
+    if (context->config.mode == PARCC_MAP) {
+        const parcc_float* origin = context->eyepos;
+        const parcc_float* upward = context->config.home_upward;
+
+        parcc_float direction[3];
+        float3_subtract(direction, context->target, origin);
+        float3_normalize(direction);
+
+        parcc_float distance;
+        parcc_raycast_plane(origin, direction, &distance, (void*)context);
+
+        const parcc_float fov = context->config.fov_degrees * VEC_PI / 180.0;
+        const parcc_float half_extent = distance * tan(fov / 2);
+
+        parcc_float target[3];
+        float3_scale(direction, distance);
+        float3_add(target, origin, direction);
+
+        // Compute the tangent frame defined by the map_plane normal and the home_upward vector.
+        parcc_float uvec[3];
+        parcc_float vvec[3];
+        parcc_float target_to_eye[3];
+
+        float3_copy(target_to_eye, context->config.map_plane);
+        float3_cross(uvec, upward, target_to_eye);
+        float3_cross(vvec, target_to_eye, uvec);
+
+        float3_subtract(target, target, context->config.home_target);
+
+        result.extent = half_extent * 2;
+        result.center[0] = float3_dot(uvec, target);
+        result.center[1] = float3_dot(vvec, target);
+    }
+    return result;
+}
 
 parcc_frame parcc_get_home_frame(const parcc_context* context) {
     parcc_frame result;
@@ -426,20 +461,35 @@ parcc_frame parcc_get_home_frame(const parcc_context* context) {
 }
 
 void parcc_set_frame(parcc_context* context, parcc_frame frame) {
-    context->current_frame = frame;
     if (context->config.mode == PARCC_MAP) {
-        const parcc_float* target = context->config.home_target;
         const parcc_float* upward = context->config.home_upward;
         const parcc_float half_extent = frame.extent / 2.0;
         const parcc_float fov = context->config.fov_degrees * VEC_PI / 180.0;
         const parcc_float distance = half_extent / tan(fov / 2);
 
+        // Compute the tangent frame defined by the map_plane normal and the home_upward vector.
+        parcc_float uvec[3];
+        parcc_float vvec[3];
         parcc_float target_to_eye[3];
-        float3_copy(target_to_eye, context->config.map_plane);
-        float3_scale(target_to_eye, distance);
 
-        float3_add(context->eyepos, target, target_to_eye);
-        float3_copy(context->target, target);
+        float3_copy(target_to_eye, context->config.map_plane);
+        float3_cross(uvec, upward, target_to_eye);
+        float3_cross(vvec, target_to_eye, uvec);
+
+        // Scale the U and V components by the frame coordinate.
+        float3_scale(uvec, frame.center[0]);
+        float3_scale(vvec, frame.center[1]);
+
+        // Obtain the new target position by adding U and V to home_target.
+        float3_copy(context->target, context->config.home_target);
+        float3_add(context->target, context->target, uvec);
+        float3_add(context->target, context->target, vvec);
+
+        // Obtain the new eye position by adding the scaled plane normal to the new target position.
+        float3_scale(target_to_eye, distance);
+        float3_add(context->eyepos, context->target, target_to_eye);
+
+        // The up vector should never change, but just for completeness go ahead and set it.
         float3_copy(context->upward, upward);
     }
 }

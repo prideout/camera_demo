@@ -9,8 +9,6 @@ do `make run`. For other platforms, simply invoke CMake in the way that you norm
 
 # TODO
 
-- Save / Go To buttons
-
 - map constraints
 
 - navigation and animation (frames)

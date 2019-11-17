@@ -6,7 +6,7 @@
 #define STB_IMAGE_RESIZE_IMPLEMENTATION
 #define STB_IMAGE_IMPLEMENTATION
 #define STBI_ONLY_PNG
-#define NANO_RT_C_IMPLEMENTATION
+#define NANO_RT_C_IMPLEMENTATION 1
 
 #include <par/par_shaders.h>
 #include <par/par_msquares.h>

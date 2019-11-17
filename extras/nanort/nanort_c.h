@@ -61,7 +61,7 @@ bool part_trace(const part_context* ctx, part_ray ray,
 // -----------------------------------------------------------------------------
 // END PUBLIC API
 // -----------------------------------------------------------------------------
-#ifdef NANO_RT_C_IMPLEMENTATION
+#if NANO_RT_C_IMPLEMENTATION
 
 #include <nanort/nanort.h>
 

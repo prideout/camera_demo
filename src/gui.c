@@ -138,16 +138,32 @@ static void define_ui(Gui* gui) {
     }
 
     mu_layout_row(ctx, 3, (int[]){93, 93, 93}, 0);
-    mu_button(ctx, "Save Frame A");
-    disable(ctx);
-    mu_button(ctx, "Go to Frame A");
-    mu_button(ctx, "Show Frame A");
+    if (mu_button(ctx, "Save Frame A")) {
+        app_save_frame(app, 0);
+    }
+    if (!app->has_frame[0]) {
+        disable(ctx);
+    }
+    if (mu_button(ctx, "Go to Frame A")) {
+        app_goto_frame(app, 0);
+    }
+    if (mu_button(ctx, "Show Frame A")) {
+        app_show_frame(app, 0);
+    }
     enable(ctx);
 
-    mu_button(ctx, "Save Frame B");
-    disable(ctx);
-    mu_button(ctx, "Go to Frame B");
-    mu_button(ctx, "Show Frame B");
+    if (mu_button(ctx, "Save Frame B")) {
+        app_save_frame(app, 1);
+    }
+    if (!app->has_frame[1]) {
+        disable(ctx);
+    }
+    if (mu_button(ctx, "Go to Frame B")) {
+        app_goto_frame(app, 1);
+    }
+    if (mu_button(ctx, "Show Frame B")) {
+        app_show_frame(app, 1);
+    }
     enable(ctx);
 
     mu_end_window(ctx);

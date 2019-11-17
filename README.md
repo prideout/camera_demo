@@ -10,16 +10,20 @@ do `make run`. For other platforms, simply invoke CMake in the way that you norm
 # TODO
 
 - map constraints
+    - PARCC_CONSTRAIN_AXIS (this is the default; work on implementing this first)
+    - PARCC_CONSTRAIN_FULL (no area outside the map can ever be visible)
+
+- add a max_zoom constaint
 
 - "Show frame" buttons
-
-- orbit mode
-    - I think the aabb should be replaced with a fallback sphere
 
 - more API cleanup
     - parcc_frame should perhaps be an opaque structure
         - could be a 4-tuple of floats (mode + 3 data fields) that gets casted to 1 of 2 types
     - I guess the config should not be passed by value. (play with coliru?)
+
+- orbit mode
+    - I think the aabb should be replaced with a fallback sphere
 
 - two emscripten demos (no microui stuff, probably)
 

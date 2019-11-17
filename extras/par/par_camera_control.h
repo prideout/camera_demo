@@ -31,7 +31,7 @@
 //       .viewport_height = 768,
 //       .near_plane = 0.01,
 //       .far_plane = 100.0,
-//       .map_extent[2] = {2000.0, 1000.0},
+//       .map_extent = {2000.0, 1000.0},
 //       .raycast_function = raycast,
 //       .raycast_userdata = mesh,
 //   });
@@ -39,7 +39,7 @@
 //  while (game_loop_is_alive) {
 //      parcc_float projection[16];
 //      parcc_float viewmatrix[16];
-//      parcc_get_matrices(controller, ctx, projection, viewmatrix);
+//      parcc_get_matrices(controller, projection, viewmatrix);
 //
 //      ...
 //   }
@@ -57,8 +57,10 @@
 extern "C" {
 #endif
 
-#ifndef parcc_float
-#define parcc_float float
+#ifdef PARCC_USE_DOUBLE
+typedef double parcc_float;
+#else
+typedef float parcc_float;
 #endif
 
 // The camera controller can be configured using either a VERTICAL or HORIZONTAL field of view.
@@ -180,20 +182,6 @@ double parcc_get_interpolation_duration(parcc_frame a, parcc_frame b);
 #include "../../src/ray_float.h"  // TODO: integrate
 #include "../../src/vec_float.h"  // TODO: integrate
 
-#ifndef PAR_PI
-#define PAR_PI (3.14159265359)
-#define PAR_MIN(a, b) (a > b ? b : a)
-#define PAR_MAX(a, b) (a > b ? a : b)
-#define PAR_CLAMP(v, lo, hi) PAR_MAX(lo, PAR_MIN(hi, v))
-#define PAR_SWAP(T, A, B) \
-    {                     \
-        T tmp = B;        \
-        B = A;            \
-        A = tmp;          \
-    }
-#define PAR_SQR(a) ((a) * (a))
-#endif
-
 #ifndef PAR_MALLOC
 #define PAR_MALLOC(T, N) ((T*)malloc(N * sizeof(T)))
 #define PAR_CALLOC(T, N) ((T*)calloc(N * sizeof(T), 1))
@@ -282,7 +270,6 @@ void parcc_get_look_at(const parcc_context* ctx, parcc_float eyepos[3], parcc_fl
 
 void parcc_grab_begin(parcc_context* context, int winx, int winy) {
     if (!parcc_do_raycast(context, winx, winy, context->grab_point_world)) {
-        puts("missed grab\n");
         return;
     }
     context->grabbing = true;
@@ -316,7 +303,6 @@ void parcc_grab_update(parcc_context* context, int winx, int winy, parcc_float s
     if (scrolldelta != 0.0) {
         parcc_float grab_point_world[3];
         if (!parcc_do_raycast(context, winx, winy, grab_point_world)) {
-            puts("missed zoom");
             return;
         }
 

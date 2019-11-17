@@ -76,7 +76,7 @@ typedef enum {
     PARCC_MAP,    // pan and zoom like Google Maps
 } parcc_mode;
 
-// Captured camera state used solely for animation.
+// Captured camera state used for animation and bookmarks.
 typedef struct {
     // Van Wijk parameters for MAP mode.
     parcc_float extent;     // world-space width or height, depending on fov_orientation.
@@ -492,10 +492,49 @@ void parcc_set_frame(parcc_context* context, parcc_frame frame) {
 }
 
 parcc_frame parcc_interpolate_frames(parcc_frame a, parcc_frame b, double t) {
-    return (parcc_frame){0};
+    const double rho = sqrt(2.0);
+    const double rho2 = 2, rho4 = 4;
+    const double ux0 = a.center[0], uy0 = a.center[1], w0 = a.extent;
+    const double ux1 = b.center[0], uy1 = b.center[1], w1 = b.extent;
+    const double dx = ux1 - ux0, dy = uy1 - uy0, d2 = dx * dx + dy * dy, d1 = sqrt(d2);
+    const double b0 = (w1 * w1 - w0 * w0 + rho4 * d2) / (2.0 * w0 * rho2 * d1);
+    const double b1 = (w1 * w1 - w0 * w0 - rho4 * d2) / (2.0 * w1 * rho2 * d1);
+    const double r0 = log(sqrt(b0 * b0 + 1.0) - b0);
+    const double r1 = log(sqrt(b1 * b1 + 1) - b1);
+    const double dr = r1 - r0;
+    const int valid_dr = (dr == dr) && dr != 0;
+    const double S = (valid_dr ? dr : log(w1 / w0)) / rho;
+    parcc_frame result;
+    const double s = t * S;
+    if (valid_dr) {
+        const double coshr0 = cosh(r0);
+        const double u = w0 / (rho2 * d1) * (coshr0 * tanh(rho * s + r0) - sinh(r0));
+        result.center[0] = ux0 + u * dx;
+        result.center[1] = uy0 + u * dy;
+        result.extent = w0 * coshr0 / cosh(rho * s + r0);
+        return result;
+    }
+    result.center[0] = ux0 + t * dx;
+    result.center[1] = uy0 + t * dy;
+    result.extent = w0 * exp(rho * s);
+    return result;
 }
 
-double parcc_get_interpolation_duration(parcc_frame a, parcc_frame b) { return 1.0; }
+double parcc_get_interpolation_duration(parcc_frame a, parcc_frame b) {
+    const double rho = sqrt(2.0);
+    const double rho2 = 2, rho4 = 4;
+    const double ux0 = a.center[0], uy0 = a.center[1], w0 = a.extent;
+    const double ux1 = b.center[0], uy1 = b.center[1], w1 = b.extent;
+    const double dx = ux1 - ux0, dy = uy1 - uy0, d2 = dx * dx + dy * dy, d1 = sqrt(d2);
+    const double b0 = (w1 * w1 - w0 * w0 + rho4 * d2) / (2.0 * w0 * rho2 * d1);
+    const double b1 = (w1 * w1 - w0 * w0 - rho4 * d2) / (2.0 * w1 * rho2 * d1);
+    const double r0 = log(sqrt(b0 * b0 + 1.0) - b0);
+    const double r1 = log(sqrt(b1 * b1 + 1) - b1);
+    const double dr = r1 - r0;
+    const int valid_dr = (dr == dr) && dr != 0;
+    const double S = (valid_dr ? dr : log(w1 / w0)) / rho;
+    return fabs(S);
+}
 
 static bool parcc_raycast_aabb(const parcc_float origin[3], const parcc_float dir[3],
                                parcc_float* t, void* userdata) {

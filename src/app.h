@@ -7,7 +7,6 @@
 
 #include <nanort/nanort_c.h>
 
-#include "camera.h"
 #include "gui.h"
 
 #define kSidebarWidth (300)
@@ -32,7 +31,7 @@ typedef struct {
 } GraphicsState;
 
 typedef struct {
-    bool van_wijk;
+    bool enabled;
     parcc_frame source;
     parcc_frame target;
     double start_time;
@@ -54,9 +53,8 @@ typedef struct App {
 
 void app_init(App* app);
 void app_draw(App* app);
-void app_start_camera_transition(App* app);
 
-void app_goto_frame(App* app, int index);
+void app_goto_frame(App* app, parcc_frame goal);
 void app_save_frame(App* app, int index);
 void app_show_frame(App* app, int index);
 

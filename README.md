@@ -9,8 +9,6 @@ do `make run`. For other platforms, simply invoke CMake in the way that you norm
 
 # TODO
 
-- animation
-
 - map constraints
 
 - "Show frame" buttons

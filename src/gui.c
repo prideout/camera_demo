@@ -134,7 +134,7 @@ static void define_ui(Gui* gui) {
     // bottom pane
     mu_layout_row(ctx, 1, (int[]){-1}, 0);
     if (mu_button(ctx, "Go to Home Frame")) {
-        parcc_set_frame(camera, parcc_get_home_frame(camera));
+        app_goto_frame(app, parcc_get_home_frame(camera));
     }
 
     mu_layout_row(ctx, 3, (int[]){93, 93, 93}, 0);
@@ -144,8 +144,8 @@ static void define_ui(Gui* gui) {
     if (!app->has_frame[0]) {
         disable(ctx);
     }
-    if (mu_button(ctx, "Go to Frame A")) {
-        app_goto_frame(app, 0);
+    if (mu_button(ctx, "Go to Frame A") && app->has_frame[0]) {
+        app_goto_frame(app, app->saved_frame[0]);
     }
     if (mu_button(ctx, "Show Frame A")) {
         app_show_frame(app, 0);
@@ -158,8 +158,8 @@ static void define_ui(Gui* gui) {
     if (!app->has_frame[1]) {
         disable(ctx);
     }
-    if (mu_button(ctx, "Go to Frame B")) {
-        app_goto_frame(app, 1);
+    if (mu_button(ctx, "Go to Frame B") && app->has_frame[1]) {
+        app_goto_frame(app, app->saved_frame[1]);
     }
     if (mu_button(ctx, "Show Frame B")) {
         app_show_frame(app, 1);
@@ -239,9 +239,6 @@ bool gui_handle(Gui* gui, const sapp_event* ev) {
             char key = ev->char_code & 255;
             if (key == 27) {
                 sapp_request_quit();
-            }
-            if (key == 'g') {
-                app_start_camera_transition(gui->app);
             }
             break;
         }

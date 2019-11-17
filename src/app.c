@@ -240,21 +240,23 @@ void app_init(App* app) {
 void app_draw(App* app) {
     const double seconds = stm_sec(stm_now());
 
+    if (app->transition.enabled) {
+        const CameraTransition anim = app->transition;
+        const double elapsed = seconds - anim.start_time;
+        const double kTransitionSpeed = 3;
+        const double duration = parcc_get_interpolation_duration(anim.source, anim.target);
+        const double t = kTransitionSpeed * elapsed / duration;
+        if (t >= 1.0) {
+            parcc_set_frame(app->camera_controller, anim.target);
+            app->transition.enabled = false;
+        } else {
+            parcc_frame frame = parcc_interpolate_frames(anim.source, anim.target, t);
+            parcc_set_frame(app->camera_controller, frame);
+        }
+    }
+
     float view[16];
     parcc_get_matrices(app->camera_controller, app->gfx.uniforms.projection, view);
-
-    if (app->transition.van_wijk) {
-        const CameraTransition trans = app->transition;
-        const double duration = parcc_get_interpolation_duration(trans.source, trans.target);
-        const double kTransitionSpeed = 3;
-        double elapsed = kTransitionSpeed * (seconds - app->transition.start_time) / duration;
-        if (elapsed >= 1.0) {
-            elapsed = 1.0;
-            app->transition.van_wijk = false;
-        }
-        const parcc_frame frame = parcc_interpolate_frames(trans.source, trans.target, elapsed);
-        parcc_set_frame(app->camera_controller, frame);
-    }
 
     float model[16];
     float16_identity(model);
@@ -287,20 +289,14 @@ void app_draw(App* app) {
     sg_commit();
 }
 
-void app_start_camera_transition(App* app) {
-    if (app->transition.van_wijk) {
+void app_goto_frame(App* app, parcc_frame goal) {
+    if (app->transition.enabled) {
         return;
     }
     app->transition.start_time = stm_sec(stm_now());
     app->transition.source = parcc_get_current_frame(app->camera_controller);
-    app->transition.target = parcc_get_home_frame(app->camera_controller);
-    app->transition.van_wijk = true;
-}
-
-void app_goto_frame(App* app, int index) {
-    if (app->has_frame[index]) {
-        parcc_set_frame(app->camera_controller, app->saved_frame[index]);
-    }
+    app->transition.target = goal;
+    app->transition.enabled = true;
 }
 
 void app_save_frame(App* app, int index) {

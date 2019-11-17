@@ -7,9 +7,16 @@ To view the documentation and play with WebAssembly demos, go [here]().
 The native demo is easy to build on macOS. First make sure you have CMake and clang installed, then
 do `make run`. For other platforms, simply invoke CMake in the way that you normally do.
 
+# Tweet
+
+I wrote a camera controller as a single-file C library. Supports smooth Van Wijk zoom & pan with
+perspective distortion. Also has an orbit mode for arcball-style control. Docs and wasm demos at
+https://github.com/prideout/camera_demo
+
 # TODO
 
 - map constraints
+    - PARCC_CONSTRAIN_NONE
     - PARCC_CONSTRAIN_AXIS (this is the default; work on implementing this first)
     - PARCC_CONSTRAIN_FULL (no area outside the map can ever be visible)
 
@@ -24,6 +31,8 @@ do `make run`. For other platforms, simply invoke CMake in the way that you norm
 
 - orbit mode
     - I think the aabb should be replaced with a fallback sphere
+
+- change mouse cursor during pan / zoom
 
 - two emscripten demos (no microui stuff, probably)
 

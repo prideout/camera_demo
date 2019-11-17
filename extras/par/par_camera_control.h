@@ -186,6 +186,9 @@ double parcc_get_interpolation_duration(parcc_frame a, parcc_frame b);
 #include "../../src/ray_float.h"  // TODO: integrate
 #include "../../src/vec_float.h"  // TODO: integrate
 
+#define PARCC_MIN(a, b) (a > b ? b : a)
+#define PARCC_MAX(a, b) (a > b ? a : b)
+#define PARCC_CLAMP(v, lo, hi) PARCC_MAX(lo, PARCC_MIN(hi, v))
 #define PARCC_CALLOC(T, N) ((T*)calloc(N * sizeof(T), 1))
 #define PARCC_FREE(BUF) free(BUF)
 
@@ -209,7 +212,9 @@ static bool parcc_raycast_plane(const parcc_float origin[3], const parcc_float d
 
 static void parcc_get_ray_far(parcc_context* context, int winx, int winy, parcc_float result[3]);
 
-static void parcc_enforce_constraints(parcc_context* context);
+static void parcc_pan_with_constraints(parcc_context* context, const parcc_float vec[3]);
+
+static void parcc_zoom_with_constraints(parcc_context* context, const parcc_float vec[3]);
 
 parcc_context* parcc_create_context(parcc_config config) {
     parcc_context* context = PARCC_CALLOC(parcc_context, 1);
@@ -296,8 +301,8 @@ void parcc_grab_update(parcc_context* context, int winx, int winy, parcc_float s
         parcc_float translation[3];
         float3_subtract(translation, far_point, context->grab_point_far);
         float3_scale(translation, -u_len / v_len);
-        float3_add(context->eyepos, context->grab_point_eyepos, translation);
-        float3_add(context->target, context->grab_point_target, translation);
+
+        parcc_pan_with_constraints(context, translation);
     }
 
     // Handle zoom.
@@ -323,10 +328,8 @@ void parcc_grab_update(parcc_context* context, int winx, int winy, parcc_float s
         }
 
         float3_scale(u_vec, scrolldelta * zoom_speed);
-        float3_add(context->eyepos, context->eyepos, u_vec);
-        float3_add(context->target, context->target, u_vec);
+        parcc_zoom_with_constraints(context, u_vec);
     }
-    parcc_enforce_constraints(context);
 }
 
 void parcc_grab_end(parcc_context* context) { context->grabbing = false; }
@@ -477,7 +480,6 @@ void parcc_goto_frame(parcc_context* context, parcc_frame frame) {
         // The up vector should never change, but just for completeness go ahead and set it.
         float3_copy(context->upward, upward);
     }
-    parcc_enforce_constraints(context);
 }
 
 parcc_frame parcc_interpolate_frames(parcc_frame a, parcc_frame b, double t) {
@@ -648,8 +650,78 @@ static void parcc_get_ray_far(parcc_context* context, int winx, int winy, parcc_
     float3_add(result, origin, gaze);
 }
 
-static void parcc_enforce_constraints(parcc_context* context) {
-    //
+static void parcc_pan_with_constraints(parcc_context* context, const parcc_float vec[3]) {
+    float3_add(context->eyepos, context->grab_point_eyepos, vec);
+    float3_add(context->target, context->grab_point_target, vec);
+}
+
+static void parcc_zoom_with_constraints(parcc_context* context, const parcc_float vec[3]) {
+    const bool horizontal = context->config.fov_orientation == PARCC_HORIZONTAL;
+    const parcc_float* map_extent = context->config.map_extent;
+    const parcc_float max_extent = horizontal ? map_extent[0] : map_extent[1];
+    const parcc_float* upward = context->config.home_upward;
+    const parcc_float fov = context->config.fov_degrees * VEC_PI / 180.0;
+
+    parcc_float eyepos[3];
+    parcc_float target[3];
+    float3_copy(eyepos, context->eyepos);
+    float3_copy(target, context->target);
+
+    parcc_float direction[3];
+    float3_subtract(direction, target, eyepos);
+    float3_normalize(direction);
+
+    // Apply unconstrained zoom.
+    float3_add(context->eyepos, eyepos, vec);
+    float3_add(context->target, target, vec);
+
+    // Check if exceeds the max zoom.
+    parcc_float distance;
+    parcc_raycast_plane(context->eyepos, direction, &distance, (void*)context);
+    const parcc_float extent = 2.0 * distance * tan(fov / 2.0);
+    if (extent > max_extent) {
+        const parcc_float ideal_distance = max_extent / (2.0 * tan(fov / 2.0));
+
+        parcc_float hit_point[3];
+        float3_scale(direction, distance);
+        float3_add(hit_point, context->eyepos, direction);
+
+        float3_normalize(direction);
+        float3_scale(direction, -ideal_distance);
+
+        // Determine the new camera position and target.
+        float3_add(context->eyepos, hit_point, direction);
+        parcc_float new_vec[3];
+        float3_subtract(new_vec, context->eyepos, eyepos);
+        float3_add(context->target, target, new_vec);
+    }
+}
+
+// TODO: remove
+static bool parcc_check_constraints(parcc_context* context) {
+    if (context->config.mode == PARCC_MAP) {
+        const parcc_frame current = parcc_get_current_frame(context);
+        parcc_frame frame = current;
+        parcc_frame home = parcc_get_home_frame(context);
+        if (frame.extent > home.extent) {
+            return false;
+        }
+        const parcc_float he = frame.extent / 2;
+        const parcc_float hw = context->config.map_extent[0] / 2;
+        const parcc_float hh = context->config.map_extent[1] / 2;
+        const parcc_float fu = frame.center[0];
+        const parcc_float fv = frame.center[1];
+        if (context->config.fov_orientation == PARCC_HORIZONTAL) {
+            if (fu != PARCC_CLAMP(fu, -hw + he, hw - he)) {
+                return false;
+            }
+        } else {
+            if (fv != PARCC_CLAMP(fv, -hh + he, hh - he)) {
+                return false;
+            }
+        }
+    }
+    return true;
 }
 
 #endif  // PAR_CAMERA_CONTROL_IMPLEMENTATION

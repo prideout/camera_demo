@@ -247,11 +247,11 @@ void app_draw(App* app) {
         const double duration = parcc_get_interpolation_duration(anim.source, anim.target);
         const double t = kTransitionSpeed * elapsed / duration;
         if (t >= 1.0) {
-            parcc_set_frame(app->camera_controller, anim.target);
+            parcc_goto_frame(app->camera_controller, anim.target);
             app->transition.enabled = false;
         } else {
             parcc_frame frame = parcc_interpolate_frames(anim.source, anim.target, t);
-            parcc_set_frame(app->camera_controller, frame);
+            parcc_goto_frame(app->camera_controller, frame);
         }
     }
 

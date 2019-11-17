@@ -12,39 +12,43 @@
 // avoided here! Instead the orientation of the camera is defined by a Y-axis rotation followed by
 // an X-axis rotation.
 //
-// Clients can also use this to implement "spin the object" functionality rather than "orbit the
-// camera", but the latter is what I designed it for. The library takes a raycast callback to
-// support precise grabbing behavior. If this is not required for your use case (e.g. a top-down
-// terrain with an orthgraphic projection), provide NULL for the callback and the library will
-// simply raycast against the ground plane.
+// The library takes a raycast callback to support precise grabbing behavior. If this is not
+// required for your use case (e.g. a top-down terrain with an orthgraphic projection), provide NULL
+// for the callback and the library will simply raycast against the ground plane.
 //
-//   #define PAR_CAMERA_CONTROL_IMPLEMENTATION
-//   #include "par_camera_control.h"
+// The following is an abbreviated usage example, for a more complete example see:
+// https://github.com/prideout/camera_demo
 //
-//   static bool raycast(float origin[3], float dir[3], float* t, void* mesh) {
-//      ... intersect with ground plane at z = 0
-//   }
+//     #define PAR_CAMERA_CONTROL_IMPLEMENTATION
+//     #include "par_camera_control.h"
 //
-//   parcc_context* controller = parc_create_context((parcc_config) {
-//       .mode = PARCC_MAP,
-//       .viewport_width = 1024,
-//       .viewport_height = 768,
-//       .near_plane = 0.01,
-//       .far_plane = 100.0,
-//       .map_extent = {2000.0, 1000.0},
-//       .raycast_function = raycast,
-//       .raycast_userdata = mesh,
-//   });
+//     static bool raycast(float origin[3], float dir[3], float* t, void* my_mesh) {
+//        ...
+//     }
 //
-//  while (game_loop_is_alive) {
-//      parcc_float projection[16];
-//      parcc_float viewmatrix[16];
-//      parcc_get_matrices(controller, projection, viewmatrix);
+//     parcc_context* controller = parc_create_context((parcc_config) {
+//         .mode = PARCC_MAP,
+//         .viewport_width = 1024,
+//         .viewport_height = 768,
+//         .near_plane = 0.01,
+//         .far_plane = 100.0,
+//         .map_plane = {0, 0, 1, 0},      // the map lies a Z=0
+//         .map_extent = {2000.0, 1000.0}, // width = 2000, height = 1000
+//         .raycast_function = raycast,    // or use NULL to intersect plane
+//         .raycast_userdata = my_mesh,
+//     });
 //
-//      ...
-//   }
-//   ....
-//   parcc_destroy_context(controller);
+//    while (game_loop) {
+//
+//        parcc_float eyepos[3], target[3], upward[3];
+//        parcc_get_look_at(controller, eyepos, target, upward);
+//        // ^ or use "parcc_get_matrices" to compute 4x4 matrices
+//
+//        my_camera->set_look_at(eyepos, target, upward);
+//        ...
+//     }
+//
+//     parcc_destroy_context(controller);
 //
 // Distributed under the MIT License, see bottom of file.
 
@@ -161,7 +165,7 @@ bool parcc_do_raycast(parcc_context* context, int winx, int winy, parcc_float re
 // Frames (captured controller states) and Van Wijk interpolation functions.
 parcc_frame parcc_get_current_frame(const parcc_context* context);
 parcc_frame parcc_get_home_frame(const parcc_context* context);
-void parcc_set_frame(parcc_context* context, parcc_frame state);
+void parcc_goto_frame(parcc_context* context, parcc_frame state);
 parcc_frame parcc_interpolate_frames(parcc_frame a, parcc_frame b, double t);
 double parcc_get_interpolation_duration(parcc_frame a, parcc_frame b);
 
@@ -182,19 +186,14 @@ double parcc_get_interpolation_duration(parcc_frame a, parcc_frame b);
 #include "../../src/ray_float.h"  // TODO: integrate
 #include "../../src/vec_float.h"  // TODO: integrate
 
-#ifndef PAR_MALLOC
-#define PAR_MALLOC(T, N) ((T*)malloc(N * sizeof(T)))
-#define PAR_CALLOC(T, N) ((T*)calloc(N * sizeof(T), 1))
-#define PAR_REALLOC(T, BUF, N) ((T*)realloc(BUF, sizeof(T) * (N)))
-#define PAR_FREE(BUF) free(BUF)
-#endif
+#define PARCC_CALLOC(T, N) ((T*)calloc(N * sizeof(T), 1))
+#define PARCC_FREE(BUF) free(BUF)
 
 struct parcc_context_s {
     parcc_config config;
     parcc_float eyepos[3];
     parcc_float target[3];
     parcc_float upward[3];
-
     bool grabbing;
     parcc_float grab_point_far[3];
     parcc_float grab_point_world[3];
@@ -202,18 +201,20 @@ struct parcc_context_s {
     parcc_float grab_point_target[3];
 };
 
-static void parcc_get_ray_far(parcc_context* context, int winx, int winy, parcc_float result[3]);
-
 static bool parcc_raycast_aabb(const parcc_float origin[3], const parcc_float dir[3],
                                parcc_float* t, void* userdata);
 
 static bool parcc_raycast_plane(const parcc_float origin[3], const parcc_float dir[3],
                                 parcc_float* t, void* userdata);
 
+static void parcc_get_ray_far(parcc_context* context, int winx, int winy, parcc_float result[3]);
+
+static void parcc_enforce_constraints(parcc_context* context);
+
 parcc_context* parcc_create_context(parcc_config config) {
-    parcc_context* context = PAR_CALLOC(parcc_context, 1);
+    parcc_context* context = PARCC_CALLOC(parcc_context, 1);
     parcc_set_config(context, config);
-    parcc_set_frame(context, parcc_get_home_frame(context));
+    parcc_goto_frame(context, parcc_get_home_frame(context));
     return context;
 }
 
@@ -246,7 +247,7 @@ void parcc_set_config(parcc_context* context, parcc_config config) {
     context->config = config;
 }
 
-void parcc_destroy_context(parcc_context* context) { PAR_FREE(context); }
+void parcc_destroy_context(parcc_context* context) { PARCC_FREE(context); }
 
 void parcc_get_matrices(const parcc_context* context, parcc_float projection[16],
                         parcc_float view[16]) {
@@ -325,6 +326,7 @@ void parcc_grab_update(parcc_context* context, int winx, int winy, parcc_float s
         float3_add(context->eyepos, context->eyepos, u_vec);
         float3_add(context->target, context->target, u_vec);
     }
+    parcc_enforce_constraints(context);
 }
 
 void parcc_grab_end(parcc_context* context) { context->grabbing = false; }
@@ -443,7 +445,7 @@ parcc_frame parcc_get_home_frame(const parcc_context* context) {
     return result;
 }
 
-void parcc_set_frame(parcc_context* context, parcc_frame frame) {
+void parcc_goto_frame(parcc_context* context, parcc_frame frame) {
     if (context->config.mode == PARCC_MAP) {
         const parcc_float* upward = context->config.home_upward;
         const parcc_float half_extent = frame.extent / 2.0;
@@ -475,6 +477,7 @@ void parcc_set_frame(parcc_context* context, parcc_frame frame) {
         // The up vector should never change, but just for completeness go ahead and set it.
         float3_copy(context->upward, upward);
     }
+    parcc_enforce_constraints(context);
 }
 
 parcc_frame parcc_interpolate_frames(parcc_frame a, parcc_frame b, double t) {
@@ -643,6 +646,10 @@ static void parcc_get_ray_far(parcc_context* context, int winx, int winy, parcc_
     float3_add(gaze, gaze, upward);
     float3_scale(gaze, context->config.far_plane);
     float3_add(result, origin, gaze);
+}
+
+static void parcc_enforce_constraints(parcc_context* context) {
+    //
 }
 
 #endif  // PAR_CAMERA_CONTROL_IMPLEMENTATION

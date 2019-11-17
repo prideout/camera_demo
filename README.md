@@ -9,10 +9,9 @@ do `make run`. For other platforms, simply invoke CMake in the way that you norm
 
 # TODO
 
-- map constraints
+- animation
 
-- navigation and animation (frames)
-    - I think we should remove tick() and consolidate the two matrix getters
+- map constraints
 
 - "Show frame" buttons
 

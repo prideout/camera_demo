@@ -240,8 +240,8 @@ void app_init(App* app) {
 void app_draw(App* app) {
     const double seconds = stm_sec(stm_now());
 
-    parcc_tick(app->camera_controller, seconds);
-    parcc_get_matrix_projection(app->camera_controller, app->gfx.uniforms.projection);
+    float view[16];
+    parcc_get_matrices(app->camera_controller, app->gfx.uniforms.projection, view);
 
     if (app->transition.van_wijk) {
         const CameraTransition trans = app->transition;
@@ -255,9 +255,6 @@ void app_draw(App* app) {
         const parcc_frame frame = parcc_interpolate_frames(trans.source, trans.target, elapsed);
         parcc_set_frame(app->camera_controller, frame);
     }
-
-    float view[16];
-    parcc_get_matrix_view(app->camera_controller, view);
 
     float model[16];
     float16_identity(model);

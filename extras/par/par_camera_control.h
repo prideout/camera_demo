@@ -16,24 +16,32 @@
 // camera", but the latter is what I designed it for. The library takes a raycast callback to
 // support precise grabbing behavior. If this is not required for your use case (e.g. a top-down
 // terrain with an orthgraphic projection), provide NULL for the callback and the library will
-// simply raycast against the plane equation that you provide.
+// simply raycast against the ground plane.
 //
 //   #define PAR_CAMERA_CONTROL_IMPLEMENTATION
 //   #include "par_camera_control.h"
 //
-//   static bool raycast(float origin[3], float dir[3], float* t, void* userdata) {
+//   static bool raycast(float origin[3], float dir[3], float* t, void* mesh) {
 //      ... intersect with ground plane at z = 0
 //   }
 //
 //   parcc_context* controller = parc_create_context((parcc_config) {
-//       .foo = bar,
+//       .mode = PARCC_MAP,
+//       .viewport_width = 1024,
+//       .viewport_height = 768,
+//       .near_plane = 0.01,
+//       .far_plane = 100.0,
+//       .map_extent[2] = {2000.0, 1000.0},
 //       .raycast_function = raycast,
-//       .raycast_userdata = userdata,
+//       .raycast_userdata = mesh,
 //   });
 //
 //  while (game_loop_is_alive) {
-//      bool dirty = parcc_tick(controller, get_time_seconds());
-//      if (dirty) { ... }
+//      parcc_float projection[16];
+//      parcc_float viewmatrix[16];
+//      parcc_get_matrices(controller, ctx, projection, viewmatrix);
+//
+//      ...
 //   }
 //   ....
 //   parcc_destroy_context(controller);
@@ -130,16 +138,15 @@ parcc_config parcc_get_config(const parcc_context* context);
 void parcc_set_config(parcc_context* context, parcc_config config);
 void parcc_destroy_context(parcc_context* ctx);
 
-// The "tick" function takes the current time (expressed in seconds), computes the current look-at
-// vectors and camera matrices, advances animation, and returns true if the camera has been dirtied
-// since the previous tick.
-bool parcc_tick(parcc_context* ctx, double time);
-
-// Camera retrieval functions. These can be called only after calling tick() at least once.
-void parcc_get_look_at(const parcc_context* ctx, parcc_float eyepos[3], parcc_float target[3],
+// Camera retrieval functions.
+void parcc_get_look_at(const parcc_context* ctx,  //
+                       parcc_float eyepos[3],     //
+                       parcc_float target[3],     //
                        parcc_float upward[3]);
-void parcc_get_matrix_projection(const parcc_context* ctx, parcc_float projection[16]);
-void parcc_get_matrix_view(const parcc_context* ctx, parcc_float view[16]);
+
+void parcc_get_matrices(const parcc_context* ctx,    //
+                        parcc_float projection[16],  //
+                        parcc_float view[16]);
 
 // Screen-space functions for user interaction. Each of these functions take winx / winy coords.
 // The winx coord should be in [0, viewport_width) where 0 is the left-most column.
@@ -196,8 +203,6 @@ double parcc_get_interpolation_duration(parcc_frame a, parcc_frame b);
 
 struct parcc_context_s {
     parcc_config config;
-    parcc_float projection[16];
-    parcc_float viewmatrix[16];
     parcc_float eyepos[3];
     parcc_float target[3];
     parcc_float upward[3];
@@ -255,17 +260,17 @@ void parcc_set_config(parcc_context* context, parcc_config config) {
 
 void parcc_destroy_context(parcc_context* context) { PAR_FREE(context); }
 
-bool parcc_tick(parcc_context* context, double seconds) {
-    float16_look_at(context->viewmatrix, context->eyepos, context->target, context->upward);
+void parcc_get_matrices(const parcc_context* context, parcc_float projection[16],
+                        parcc_float view[16]) {
+    float16_look_at(view, context->eyepos, context->target, context->upward);
     const parcc_config cfg = context->config;
     const parcc_float aspect = (parcc_float)cfg.viewport_width / cfg.viewport_height;
     const parcc_float fov = cfg.fov_degrees;
     if (context->config.fov_orientation == PARCC_HORIZONTAL) {
-        float16_perspective_x(context->projection, fov, aspect, cfg.near_plane, cfg.far_plane);
+        float16_perspective_x(projection, fov, aspect, cfg.near_plane, cfg.far_plane);
     } else {
-        float16_perspective_y(context->projection, fov, aspect, cfg.near_plane, cfg.far_plane);
+        float16_perspective_y(projection, fov, aspect, cfg.near_plane, cfg.far_plane);
     }
-    return true;  // TODO: dirty flag
 }
 
 void parcc_get_look_at(const parcc_context* ctx, parcc_float eyepos[3], parcc_float target[3],
@@ -273,14 +278,6 @@ void parcc_get_look_at(const parcc_context* ctx, parcc_float eyepos[3], parcc_fl
     float3_copy(eyepos, ctx->eyepos);
     float3_copy(target, ctx->target);
     float3_copy(upward, ctx->upward);
-}
-
-void parcc_get_matrix_projection(const parcc_context* ctx, parcc_float projection[16]) {
-    float16_copy(projection, ctx->projection);
-}
-
-void parcc_get_matrix_view(const parcc_context* ctx, parcc_float view[16]) {
-    float16_copy(view, ctx->viewmatrix);
 }
 
 void parcc_grab_begin(parcc_context* context, int winx, int winy) {

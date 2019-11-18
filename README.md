@@ -15,8 +15,6 @@ https://github.com/prideout/camera_demo
 
 # TODO
 
-- Add quad to allow users to see map boundary
-
 - add a max_zoom constraint (or make the existing one configurable)
 
 - "Show frame" buttons

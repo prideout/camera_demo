@@ -229,9 +229,9 @@ void app_init(App* app) {
         .uniforms[1].type = SG_UNIFORMTYPE_MAT4,
         .uniforms[2].name = "projection",
         .uniforms[2].type = SG_UNIFORMTYPE_MAT4,
-        .uniforms[3].name = "world_extent",
+        .uniforms[3].name = "map_extent",
         .uniforms[3].type = SG_UNIFORMTYPE_FLOAT2,
-        .uniforms[4].name = "world_center",
+        .uniforms[4].name = "map_center",
         .uniforms[4].type = SG_UNIFORMTYPE_FLOAT2,
     };
 
@@ -258,7 +258,7 @@ void app_init(App* app) {
         .vs.uniform_blocks[0] = block,
         .fs.images[0].name = "ocean",
         .fs.images[0].type = SG_IMAGETYPE_2D,
-        .vs.source = parsh_get_blocks(shaders, "prefix terrain.vs"),
+        .vs.source = parsh_get_blocks(shaders, "prefix ocean.vs"),
         .fs.source = parsh_get_blocks(shaders, "prefix terrain.fs"),
     });
 
@@ -328,6 +328,11 @@ void app_draw(App* app) {
     sg_apply_bindings(&app->gfx.terrain_bindings);
     sg_apply_uniforms(SG_SHADERSTAGE_VS, 0, &app->gfx.uniforms, sizeof(Uniforms));
     sg_draw(0, app->gfx.num_elements, 1);
+
+    sg_apply_pipeline(app->gfx.ocean_pipeline);
+    sg_apply_bindings(&app->gfx.ocean_bindings);
+    sg_apply_uniforms(SG_SHADERSTAGE_VS, 0, &app->gfx.uniforms, sizeof(Uniforms));
+    sg_draw(0, 6, 1);
 
     sg_apply_viewport(0, 0, sapp_width(), vp_height, false);
     gui_draw(app->gui);

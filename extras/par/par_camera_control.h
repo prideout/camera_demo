@@ -651,8 +651,46 @@ static void parcc_get_ray_far(parcc_context* context, int winx, int winy, parcc_
 }
 
 static void parcc_pan_with_constraints(parcc_context* context, const parcc_float vec[3]) {
+    const bool horizontal = context->config.fov_orientation == PARCC_HORIZONTAL;
+    const parcc_float width = context->config.viewport_width;
+    const parcc_float height = context->config.viewport_height;
+    const parcc_float aspect = width / height;
+    const parcc_float map_width = context->config.map_extent[0] / 2;
+    const parcc_float map_height = context->config.map_extent[1] / 2;
+
     float3_add(context->eyepos, context->grab_point_eyepos, vec);
     float3_add(context->target, context->grab_point_target, vec);
+
+    parcc_frame frame = parcc_get_current_frame(context);
+    parcc_float x = frame.center[0];
+    parcc_float y = frame.center[1];
+
+    if (context->config.fov_orientation == PARCC_HORIZONTAL) {
+        const parcc_float vp_width = frame.extent / 2;
+        const parcc_float vp_height = vp_width / aspect;
+        assert(map_width >= vp_width);
+        x = PARCC_CLAMP(x, -map_width + vp_width, map_width - vp_width);
+        if (map_height < vp_height) {
+            y = PARCC_CLAMP(y, -vp_height + map_height, vp_height - map_height);
+        } else {
+            y = PARCC_CLAMP(y, -map_height + vp_height, map_height - vp_height);
+        }
+    } else {
+        const parcc_float vp_height = frame.extent / 2;
+        const parcc_float vp_width = vp_height * aspect;
+        assert(map_height >= vp_height);
+        y = PARCC_CLAMP(y, -map_height + vp_height, map_height - vp_height);
+        if (map_width < vp_width) {
+            x = PARCC_CLAMP(x, -vp_width + map_width, vp_width - map_width);
+        } else {
+            x = PARCC_CLAMP(x, -map_width + vp_width, map_width - vp_width);
+        }
+    }
+
+    frame.center[0] = x;
+    frame.center[1] = y;
+
+    parcc_goto_frame(context, frame);
 }
 
 static void parcc_zoom_with_constraints(parcc_context* context, const parcc_float vec[3]) {
@@ -695,33 +733,6 @@ static void parcc_zoom_with_constraints(parcc_context* context, const parcc_floa
         float3_subtract(new_vec, context->eyepos, eyepos);
         float3_add(context->target, target, new_vec);
     }
-}
-
-// TODO: remove
-static bool parcc_check_constraints(parcc_context* context) {
-    if (context->config.mode == PARCC_MAP) {
-        const parcc_frame current = parcc_get_current_frame(context);
-        parcc_frame frame = current;
-        parcc_frame home = parcc_get_home_frame(context);
-        if (frame.extent > home.extent) {
-            return false;
-        }
-        const parcc_float he = frame.extent / 2;
-        const parcc_float hw = context->config.map_extent[0] / 2;
-        const parcc_float hh = context->config.map_extent[1] / 2;
-        const parcc_float fu = frame.center[0];
-        const parcc_float fv = frame.center[1];
-        if (context->config.fov_orientation == PARCC_HORIZONTAL) {
-            if (fu != PARCC_CLAMP(fu, -hw + he, hw - he)) {
-                return false;
-            }
-        } else {
-            if (fv != PARCC_CLAMP(fv, -hh + he, hh - he)) {
-                return false;
-            }
-        }
-    }
-    return true;
 }
 
 #endif  // PAR_CAMERA_CONTROL_IMPLEMENTATION

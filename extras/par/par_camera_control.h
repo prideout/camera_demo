@@ -473,14 +473,36 @@ parcc_frame parcc_get_current_frame(const parcc_context* context) {
 }
 
 parcc_frame parcc_get_home_frame(const parcc_context* context) {
-    parcc_frame result;
+    const parcc_float width = context->config.viewport_width;
+    const parcc_float height = context->config.viewport_height;
+    const parcc_float aspect = width / height;
+    const parcc_float map_width = context->config.map_extent[0] / 2;
+    const parcc_float map_height = context->config.map_extent[1] / 2;
+
+    parcc_frame frame;
     if (context->config.mode == PARCC_MAP) {
         const bool horiz = context->config.fov_orientation == PARCC_HORIZONTAL;
-        result.extent = horiz ? context->config.map_extent[0] : context->config.map_extent[1];
-        result.center[0] = 0;
-        result.center[1] = 0;
+        frame.extent = horiz ? context->config.map_extent[0] : context->config.map_extent[1];
+        frame.center[0] = 0;
+        frame.center[1] = 0;
+        if (context->config.map_constraint != PARCC_CONSTRAIN_FULL) {
+            return frame;
+        }
+        if (horiz) {
+            parcc_float vp_width = frame.extent / 2;
+            parcc_float vp_height = vp_width / aspect;
+            if (map_height < vp_height) {
+                frame.extent = 2 * map_height * aspect;
+            }
+        } else {
+            parcc_float vp_height = frame.extent / 2;
+            parcc_float vp_width = vp_height * aspect;
+            if (map_width < vp_width) {
+                frame.extent = 2 * map_width / aspect;
+            }
+        }
     }
-    return result;
+    return frame;
 }
 
 void parcc_goto_frame(parcc_context* context, parcc_frame frame) {

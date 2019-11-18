@@ -8,8 +8,6 @@ uniform mat4 inverse_modelview;
 uniform mat4 projection;
 uniform vec2 map_extent;
 uniform vec2 map_center;
-uniform vec4 frame_a;
-uniform vec4 frame_b;
 
 out vec3 vnormal;
 out vec2 vuv;
@@ -35,8 +33,6 @@ uniform mat4 inverse_modelview;
 uniform mat4 projection;
 uniform vec2 map_extent;
 uniform vec2 map_center;
-uniform vec4 frame_a;
-uniform vec4 frame_b;
 
 out vec3 vnormal;
 out vec2 vuv;
@@ -79,8 +75,6 @@ uniform mat4 inverse_modelview;
 uniform mat4 projection;
 uniform vec2 map_extent;
 uniform vec2 map_center;
-uniform vec4 frame_a; // view_mode, extent, center_x, center_y
-uniform vec4 frame_b;
 
 uniform sampler2D terrain;
 
@@ -89,21 +83,4 @@ out vec4 frag_color;
 void main() {
     frag_color = texture(terrain, vuv);
     frag_color.a = 1.0;
-
-    // Draw a line across the FOV extent of the saved frame(s)
-
-    float thickness = 0.01;
-
-    float a_view_mode = frame_a.x;
-    float a_extent = frame_a.y;
-    vec2 a_center = vec2(frame_a.z, frame_a.w);
-
-    if (a_view_mode == 2.0) { // horizontal FOV
-        if (vpos.x >= a_center.x - a_extent / 2 &&
-            vpos.x <= a_center.x + a_extent / 2 &&
-            vpos.y >= a_center.y - thickness &&
-            vpos.y <= a_center.y + thickness) {
-            frag_color = mix(frag_color, vec4(1), 0.5);
-        }
-    }
 }

@@ -139,7 +139,7 @@ static void define_ui(Gui* gui) {
         app_goto_frame(app, parcc_get_home_frame(camera));
     }
 
-    mu_layout_row(ctx, 3, (int[]){93, 93, 93}, 0);
+    mu_layout_row(ctx, 2, (int[]){142, -1}, 0);
     if (mu_button(ctx, "Save Frame A")) {
         app_save_frame(app, 0);
     }
@@ -148,9 +148,6 @@ static void define_ui(Gui* gui) {
     }
     if (mu_button(ctx, "Go to Frame A") && app->has_frame[0]) {
         app_goto_frame(app, app->saved_frame[0]);
-    }
-    if (mu_button(ctx, "Show Frame A")) {
-        app_show_frame(app, 0);
     }
     enable(ctx);
 
@@ -162,9 +159,6 @@ static void define_ui(Gui* gui) {
     }
     if (mu_button(ctx, "Go to Frame B") && app->has_frame[1]) {
         app_goto_frame(app, app->saved_frame[1]);
-    }
-    if (mu_button(ctx, "Show Frame B")) {
-        app_show_frame(app, 1);
     }
     enable(ctx);
 

@@ -21,8 +21,6 @@ typedef struct {
     float projection[16];
     float map_extent[2];
     float map_center[2];
-    float frame_a[4];
-    float frame_b[4];
 } Uniforms;
 
 typedef struct {
@@ -62,6 +60,5 @@ void app_draw(App* app);
 
 void app_goto_frame(App* app, parcc_frame goal);
 void app_save_frame(App* app, int index);
-void app_show_frame(App* app, int index);
 
 bool app_intersects_mesh(const float origin[3], const float dir[3], float* t, void* userdata);

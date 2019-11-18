@@ -15,9 +15,8 @@ https://github.com/prideout/camera_demo
 
 # TODO
 
-- add a max_zoom constraint (or make the existing one configurable)
-
-- "Show frame" buttons
+- "Show frame" buttons, Add two uniforms for this.
+    app_show_frame
 
 - more API cleanup
     - parcc_frame should perhaps be an opaque structure

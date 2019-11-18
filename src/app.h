@@ -10,7 +10,7 @@
 #include "gui.h"
 
 #define kSidebarWidth (300)
-#define kNearPlane (0.01)
+#define kNearPlane (0.001)
 #define kFarPlane (100)
 
 typedef enum { VISUAL_MODE_2D, VISUAL_MODE_3D } VisualMode;

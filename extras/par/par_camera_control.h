@@ -84,7 +84,7 @@ typedef enum {
 
 // Pan and zoom constraints for MAP mode.
 typedef enum {
-    // No constraints except that max_zoom is still enforced.
+    // No constraints except that map_min_distance are still enforced.
     PARCC_CONSTRAIN_NONE,
 
     // Constrains pan and zoom to limit the viewport's extent along the FOV axis so that it always
@@ -136,6 +136,7 @@ typedef struct {
     parcc_float map_extent[2];        // constraints for map_plane (centered at home_target)
     parcc_float map_plane[4];         // plane equation with normalized XYZ, defaults to (0,0,1,0)
     parcc_constraint map_constraint;  // defaults to PARCC_CONSTRAIN_NONE
+    parcc_float map_min_distance;     // constrains zoom using distance between camera and plane
 
     parcc_fov fov_orientation;  // defaults to PARCC_VERTICAL
     parcc_float fov_degrees;    // full field-of-view angle (not half-angle), defaults to 33.
@@ -171,9 +172,15 @@ void parcc_get_matrices(const parcc_context* ctx,    //
                         parcc_float projection[16],  //
                         parcc_float view[16]);
 
-// Screen-space functions for user interaction. Each of these functions take winx / winy coords.
-// The winx coord should be in [0, viewport_width) where 0 is the left-most column.
-// The winy coord should be in [0, viewport_height) where 0 is the top-most row.
+// Screen-space functions for user interaction.
+//
+// Each of these functions take winx / winy coords.
+// - The winx coord should be in [0, viewport_width) where 0 is the left-most column.
+// - The winy coord should be in [0, viewport_height) where 0 is the top-most row.
+//
+// The scrolldelta argument is used for zooming; positive indicates "zoom in". This gets scaled by
+// zoom_speed. Zoom speed is also scaled by distance-to-ground. To prevent zooming in too far, use a
+// non-zero value for min_distance.
 void parcc_grab_begin(parcc_context* context, int winx, int winy);
 void parcc_grab_update(parcc_context* context, int winx, int winy, parcc_float scrolldelta);
 void parcc_grab_end(parcc_context* context);
@@ -356,11 +363,15 @@ void parcc_grab_update(parcc_context* context, int winx, int winy, parcc_float s
         parcc_float u_vec[3];
         float3_subtract(u_vec, grab_point_world, context->eyepos);
 
-        // Do not zoom in too far (this prevents getting stuck).
+        // Prevent getting stuck; this needs to be done regardless
+        // of the user's min_distance setting, which is enforced in
+        // parcc_move_with_constraints.
         const parcc_float zoom_speed = context->config.zoom_speed;
-        const parcc_float u_len = float3_length(u_vec);
-        if (u_len < zoom_speed && scrolldelta > 0.0) {
-            return;
+        if (scrolldelta > 0.0) {
+            const parcc_float distance_to_surface = float3_length(u_vec);
+            if (distance_to_surface < zoom_speed) {
+                return;
+            }
         }
 
         float3_scale(u_vec, scrolldelta * zoom_speed);
@@ -727,15 +738,25 @@ static void parcc_move_with_constraints(parcc_context* context, const parcc_floa
     const parcc_float map_height = context->config.map_extent[1] / 2;
     const parcc_frame home = parcc_get_home_frame(context);
     const parcc_frame previous_frame = parcc_get_current_frame(context);
+    const parcc_float fov = context->config.fov_degrees * VEC_PI / 180.0;
+    const parcc_float min_extent = 2.0 * context->config.map_min_distance * tan(fov / 2);
 
     float3_copy(context->eyepos, eyepos);
     float3_copy(context->target, target);
 
+    parcc_frame frame = parcc_get_current_frame(context);
+
+    if (frame.extent < min_extent) {
+        frame.extent = min_extent;
+        frame.center[0] = previous_frame.center[0];
+        frame.center[1] = previous_frame.center[1];
+    }
+
     if (constraint == PARCC_CONSTRAIN_NONE) {
+        parcc_goto_frame(context, frame);
         return;
     }
 
-    parcc_frame frame = parcc_get_current_frame(context);
     parcc_float x = frame.center[0];
     parcc_float y = frame.center[1];
 

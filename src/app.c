@@ -208,6 +208,7 @@ void app_init(App* app) {
         .near_plane = kNearPlane,
         .far_plane = kFarPlane,
         .map_extent = {extent[0], extent[1]},
+        .map_min_distance = app->max_corner[2],
         .fov_orientation = PARCC_HORIZONTAL,
         .raycast_function = app_intersects_mesh,
         .raycast_userdata = (void*)app,

@@ -15,7 +15,7 @@ https://github.com/prideout/camera_demo
 
 # TODO
 
-- add support for PARCC_CONSTRAIN_FULL to parcc_move_with_constraints
+- Add quad to allow users to see map boundary
 
 - add a max_zoom constraint (or make the existing one configurable)
 

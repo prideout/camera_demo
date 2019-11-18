@@ -265,12 +265,20 @@ void parcc_set_config(parcc_context* context, parcc_config config) {
         *phi = (parcc_range){-89, +89};
     }
 
-    bool go_home = config.map_constraint != context->config.map_constraint;
+    bool more_constrained = (int)config.map_constraint > (int)context->config.map_constraint;
+    bool orientation_changed = config.fov_orientation != context->config.fov_orientation;
+    bool viewport_resized = config.viewport_height != context->config.viewport_height ||
+                            config.viewport_width != context->config.viewport_width;
 
     context->config = config;
 
-    if (go_home) {
-        parcc_goto_frame(context, parcc_get_home_frame(context));
+    if (more_constrained || orientation_changed ||
+        (viewport_resized && context->config.map_constraint == PARCC_CONSTRAIN_FULL)) {
+        parcc_float eyepos[3];
+        parcc_float target[3];
+        parcc_float upward[3];
+        parcc_get_look_at(context, eyepos, target, upward);
+        parcc_move_with_constraints(context, eyepos, target);
     }
 }
 
@@ -743,7 +751,16 @@ static void parcc_move_with_constraints(parcc_context* context, const parcc_floa
         }
         x = PARCC_CLAMP(x, -map_width + vp_width, map_width - vp_width);
         if (map_height < vp_height) {
-            y = PARCC_CLAMP(y, -vp_height + map_height, vp_height - map_height);
+            if (context->config.map_constraint == PARCC_CONSTRAIN_FULL) {
+                frame.extent = 2 * map_height * aspect;
+                vp_width = frame.extent / 2;
+                vp_height = vp_width / aspect;
+                x = previous_frame.center[0];
+                x = PARCC_CLAMP(x, -map_width + vp_width, map_width - vp_width);
+                y = PARCC_CLAMP(y, -map_height + vp_height, map_height - vp_height);
+            } else {
+                y = PARCC_CLAMP(y, -vp_height + map_height, vp_height - map_height);
+            }
         } else {
             y = PARCC_CLAMP(y, -map_height + vp_height, map_height - vp_height);
         }
@@ -759,7 +776,16 @@ static void parcc_move_with_constraints(parcc_context* context, const parcc_floa
         }
         y = PARCC_CLAMP(y, -map_height + vp_height, map_height - vp_height);
         if (map_width < vp_width) {
-            x = PARCC_CLAMP(x, -vp_width + map_width, vp_width - map_width);
+            if (context->config.map_constraint == PARCC_CONSTRAIN_FULL) {
+                frame.extent = 2 * map_width / aspect;
+                vp_height = frame.extent / 2;
+                vp_width = vp_height * aspect;
+                y = previous_frame.center[1];
+                y = PARCC_CLAMP(y, -map_height + vp_height, map_height - vp_height);
+                x = PARCC_CLAMP(x, -map_width + vp_width, map_width - vp_width);
+            } else {
+                x = PARCC_CLAMP(x, -vp_width + map_width, vp_width - map_width);
+            }
         } else {
             x = PARCC_CLAMP(x, -map_width + vp_width, map_width - vp_width);
         }

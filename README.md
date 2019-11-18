@@ -15,8 +15,6 @@ https://github.com/prideout/camera_demo
 
 # TODO
 
-- 3-way radio buttons
-
 - PARCC_CONSTRAIN_FULL
 
 - add a max_zoom constraint (or make the existing one configurable)

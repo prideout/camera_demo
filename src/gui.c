@@ -57,22 +57,16 @@ typedef struct {
     int val;
 } mux_Button;
 
-static void mux_radio_buttons(mu_Context* ctx, int* val, mux_Button a, mux_Button b) {
-    if (*val == a.val) {
-        activate(ctx);
-    } else {
-        enable(ctx);
-    }
-    if (mu_button(ctx, a.label)) {
-        *val = a.val;
-    }
-    if (*val == b.val) {
-        activate(ctx);
-    } else {
-        enable(ctx);
-    }
-    if (mu_button(ctx, b.label)) {
-        *val = b.val;
+static void mux_radio_buttons(const mux_Button* buttons, mu_Context* ctx, int* val, int count) {
+    for (int i = 0; i < count; i++) {
+        if (*val == buttons[i].val) {
+            activate(ctx);
+        } else {
+            enable(ctx);
+        }
+        if (mu_button(ctx, buttons[i].label)) {
+            *val = buttons[i].val;
+        }
     }
     enable(ctx);
 }
@@ -104,19 +98,20 @@ static void define_ui(Gui* gui) {
     config = parcc_get_config(camera);
 
     mu_layout_row(ctx, 2, (int[]){142, -1}, 0);
-    mux_radio_buttons(ctx, (int*)&config.mode,                  //
-                      (mux_Button){"Orbit mode", PARCC_ORBIT},  //
-                      (mux_Button){"Map mode", PARCC_MAP});
-    mux_radio_buttons(ctx, (int*)&config.fov_orientation,            //
-                      (mux_Button){"Vertical FOV", PARCC_VERTICAL},  //
-                      (mux_Button){"Horizontal FOV", PARCC_HORIZONTAL});
+    mux_radio_buttons((mux_Button[]){{"Orbit mode", PARCC_ORBIT},  //
+                                     {"Map mode", PARCC_MAP}},     //
+                      ctx, (int*)&config.mode, 2);
+
+    mux_radio_buttons((mux_Button[]){{"Vertical FOV", PARCC_VERTICAL},       //
+                                     {"Horizontal FOV", PARCC_HORIZONTAL}},  //
+                      ctx, (int*)&config.fov_orientation, 2);
 
     if (config.mode == PARCC_MAP) {
         mu_layout_row(ctx, 3, (int[]){93, 93, 93}, 0);
-        mux_radio_buttons(ctx, (int*)&config.map_constraint,                       //
-                          (mux_Button){"No constraint", PARCC_VERTICAL},           //
-                          (mux_Button){"Axis constraint", PARCC_CONSTRAIN_AXIS});  //
-        //(mux_Button){"Full constraint", PARCC_CONSTRAIN_FULL});
+        mux_radio_buttons((mux_Button[]){{"No constraint", PARCC_VERTICAL},
+                                         {"Axis constraint", PARCC_CONSTRAIN_AXIS},
+                                         {"Full constraint", PARCC_CONSTRAIN_FULL}},
+                          ctx, (int*)&config.map_constraint, 3);
     }
 
     mu_layout_row(ctx, 2, (int[]){85, -1}, 0);

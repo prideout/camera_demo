@@ -180,7 +180,7 @@ void app_init(App* app) {
         .triangles = app->mesh->triangles,
         .num_triangles = app->mesh->ntriangles,
     };
-    app->raytracer = part_create_context((part_config){0}, mesh);
+    app->raytracer = part_create_context((part_config){.bin_size = 5}, mesh);
     printf("Created raytracer BVH in %.0f ms\n", stm_ms(stm_diff(stm_now(), start_bvh)));
 
     const parcc_aabb aabb = {

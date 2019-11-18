@@ -10,7 +10,7 @@ do `make run`. For other platforms, simply invoke CMake in the way that you norm
 # Tweet
 
 I wrote a camera controller as a single-file C library. Supports smooth Van Wijk zoom & pan with
-perspective distortion. Also has an orbit mode for arcball-style control. Docs and wasm demos at
+perspective correction. Also has an orbit mode for arcball-style control. Docs and wasm demos at
 https://github.com/prideout/camera_demo
 
 # TODO

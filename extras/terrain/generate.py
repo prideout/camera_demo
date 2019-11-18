@@ -14,6 +14,7 @@ falloff_stretch = (0.5, 1.1)
 def trim(img):
     img = snowy.resize(img, width=4000)
     img = img[:, 300:3500, :]
+    img = snowy.resize(img, width=3200, height=1335)
     return img
 
 

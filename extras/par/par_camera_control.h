@@ -82,13 +82,29 @@ typedef enum {
     PARCC_MAP,    // pan and zoom like Google Maps
 } parcc_mode;
 
+// Pan and zoom constraints for MAP mode.
+typedef enum {
+    // No constraints except that max_zoom is still enforced.
+    PARCC_CONSTRAIN_NONE,
+
+    // Constrains pan and zoom to limit the viewport's extent along the FOV axis so that it always
+    // lies within the map_extent. With this constraint, it is possible to see the entire map at
+    // once, but some portion of the map must always be visible.
+    PARCC_CONSTRAIN_AXIS,
+
+    // Constrains pan and zoom to limit the viewport's extent into the map_extent. With this
+    // constraint, it may be impossible to see the entire map at once, but users can never see any
+    // of the empty void that lies outside the map extent.
+    PARCC_CONSTRAIN_FULL,
+} parcc_constraint;
+
 // Captured camera state used for animation and bookmarks.
 typedef struct {
-    // Van Wijk parameters for MAP mode.
-    parcc_float extent;     // world-space width or height, depending on fov_orientation.
-    parcc_float center[2];  // vector from home_target that gets projected to map_plane.
+    // Van Wijk parameters for MAP mode
+    parcc_float extent;     // world-space width or height, depending on fov_orientation
+    parcc_float center[2];  // vector from home_target that gets projected to map_plane
 
-    // Radius and euler angles for ORBIT mode. Nope, does not use quaternions.
+    // Radius and euler angles for ORBIT mode. Nope, does not use quaternions
     parcc_float radius;  // world-space distance between home_target and camera
     parcc_float theta;   // Y axis rotation (applied first)
     parcc_float phi;     // X axis rotation (applied second)
@@ -117,8 +133,9 @@ typedef struct {
     parcc_float near_plane;  // distance between camera and near clipping plane
     parcc_float far_plane;   // distance between camera and far clipping plane
 
-    parcc_float map_extent[2];  // constraints for map_plane (centered at home_target)
-    parcc_float map_plane[4];   // plane equation with normalized XYZ, defaults to (0,0,1,0)
+    parcc_float map_extent[2];        // constraints for map_plane (centered at home_target)
+    parcc_float map_plane[4];         // plane equation with normalized XYZ, defaults to (0,0,1,0)
+    parcc_constraint map_constraint;  // defaults to PARCC_CONSTRAIN_NONE
 
     parcc_fov fov_orientation;  // defaults to PARCC_VERTICAL
     parcc_float fov_degrees;    // full field-of-view angle (not half-angle), defaults to 33.
@@ -248,7 +265,13 @@ void parcc_set_config(parcc_context* context, parcc_config config) {
         *phi = (parcc_range){-89, +89};
     }
 
+    bool go_home = config.map_constraint != context->config.map_constraint;
+
     context->config = config;
+
+    if (go_home) {
+        parcc_goto_frame(context, parcc_get_home_frame(context));
+    }
 }
 
 void parcc_destroy_context(parcc_context* context) { PARCC_FREE(context); }
@@ -665,6 +688,7 @@ static void parcc_get_ray_far(parcc_context* context, int winx, int winy, parcc_
 
 static void parcc_move_with_constraints(parcc_context* context, const parcc_float eyepos[3],
                                         const parcc_float target[3]) {
+    const parcc_constraint constraint = context->config.map_constraint;
     const bool horizontal = context->config.fov_orientation == PARCC_HORIZONTAL;
     const parcc_float width = context->config.viewport_width;
     const parcc_float height = context->config.viewport_height;
@@ -676,6 +700,10 @@ static void parcc_move_with_constraints(parcc_context* context, const parcc_floa
 
     float3_copy(context->eyepos, eyepos);
     float3_copy(context->target, target);
+
+    if (constraint == PARCC_CONSTRAIN_NONE) {
+        return;
+    }
 
     parcc_frame frame = parcc_get_current_frame(context);
     parcc_float x = frame.center[0];

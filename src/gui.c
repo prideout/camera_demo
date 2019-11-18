@@ -81,6 +81,13 @@ static void define_ui(Gui* gui) {
     mu_Context* ctx = &gui->ctx;
     App* app = gui->app;
     parcc_context* camera = app->camera_controller;
+
+    parcc_float eyepos[3];
+    parcc_float target[3];
+    parcc_float upward[3];
+    parcc_get_look_at(camera, eyepos, target, upward);
+
+    char buf[128];
     mu_begin(ctx);
 
     if (!gui->window.inited) {
@@ -97,14 +104,20 @@ static void define_ui(Gui* gui) {
     config = parcc_get_config(camera);
 
     mu_layout_row(ctx, 2, (int[]){142, -1}, 0);
-
     mux_radio_buttons(ctx, (int*)&config.mode,                  //
                       (mux_Button){"Orbit mode", PARCC_ORBIT},  //
                       (mux_Button){"Map mode", PARCC_MAP});
-
     mux_radio_buttons(ctx, (int*)&config.fov_orientation,            //
                       (mux_Button){"Vertical FOV", PARCC_VERTICAL},  //
                       (mux_Button){"Horizontal FOV", PARCC_HORIZONTAL});
+
+    if (config.mode == PARCC_MAP) {
+        mu_layout_row(ctx, 3, (int[]){93, 93, 93}, 0);
+        mux_radio_buttons(ctx, (int*)&config.map_constraint,                       //
+                          (mux_Button){"No constraint", PARCC_VERTICAL},           //
+                          (mux_Button){"Axis constraint", PARCC_CONSTRAIN_AXIS});  //
+        //(mux_Button){"Full constraint", PARCC_CONSTRAIN_FULL});
+    }
 
     mu_layout_row(ctx, 2, (int[]){85, -1}, 0);
     mu_label(ctx, "FOV Degrees");
@@ -115,12 +128,6 @@ static void define_ui(Gui* gui) {
     mu_checkbox(ctx, &raycast, "Raycast with mesh for precise zoom / pan");
     config.raycast_function = raycast ? app_intersects_mesh : NULL;
 
-    parcc_float eyepos[3];
-    parcc_float target[3];
-    parcc_float upward[3];
-    parcc_get_look_at(camera, eyepos, target, upward);
-
-    char buf[128];
     mu_layout_row(ctx, 1, (int[]){-1}, 0);
     snprintf(buf, 128, "Camera position: %.03g, %.03g, %.03g", eyepos[0], eyepos[1], eyepos[2]);
     ctx->style->colors[MU_COLOR_TEXT] = kInfoTextColor;

@@ -16,11 +16,14 @@ https://github.com/prideout/camera_demo
 # TODO
 
 - map constraints
-    - PARCC_CONSTRAIN_NONE
-    - PARCC_CONSTRAIN_AXIS (this is the default; work on implementing this first)
-    - PARCC_CONSTRAIN_FULL (no area outside the map can ever be visible)
+    - PARCC_CONSTRAIN_NONE - No constraints on pan and zoom (except that max_zoom is still enforced)
+    - PARCC_CONSTRAIN_AXIS - Constrains pan and zoom to limit the viewport's extent along the FOV axis so that it always lies within the map_extent.
+                             With this constraint, it is possible to see the entire map at once, but some portion of the map must always be visible.
+    - PARCC_CONSTRAIN_FULL - Constrains pan and zoom to limit the viewport's extent into the map_extent.
+                             With this constraint, it may be impossible to see the entire map at once, but users can never see any of the empty void that lies outside the map extent.
+    - set_config() automatically jumps home when this changes.
 
-- add a max_zoom constaint
+- add a max_zoom constraint (or make the existing one configurable)
 
 - "Show frame" buttons
 

@@ -21,6 +21,8 @@ typedef struct {
     float projection[16];
     float map_extent[2];
     float map_center[2];
+    float frame_a[4];
+    float frame_b[4];
 } Uniforms;
 
 typedef struct {

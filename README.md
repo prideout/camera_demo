@@ -15,9 +15,6 @@ https://github.com/prideout/camera_demo
 
 # TODO
 
-- "Show frame" buttons, Add two uniforms for this.
-    app_show_frame
-
 - more API cleanup
     - parcc_frame should perhaps be an opaque structure
         - could be a 4-tuple of floats (mode + 3 data fields) that gets casted to 1 of 2 types

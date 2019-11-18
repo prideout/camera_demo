@@ -234,6 +234,10 @@ void app_init(App* app) {
         .uniforms[3].type = SG_UNIFORMTYPE_FLOAT2,
         .uniforms[4].name = "map_center",
         .uniforms[4].type = SG_UNIFORMTYPE_FLOAT2,
+        .uniforms[5].name = "frame_a",
+        .uniforms[5].type = SG_UNIFORMTYPE_FLOAT4,
+        .uniforms[6].name = "frame_b",
+        .uniforms[6].type = SG_UNIFORMTYPE_FLOAT4,
     };
 
     sg_shader terrain_program = sg_make_shader(&(sg_shader_desc){
@@ -353,10 +357,22 @@ void app_goto_frame(App* app, parcc_frame goal) {
 }
 
 void app_save_frame(App* app, int index) {
-    app->saved_frame[index] = parcc_get_current_frame(app->camera_controller);
+    parcc_frame frame = app->saved_frame[index] = parcc_get_current_frame(app->camera_controller);
     app->has_frame[index] = true;
+    float* frame_uniforms = index ? app->gfx.uniforms.frame_b : app->gfx.uniforms.frame_a;
+    const float* frame_data = (const float*)&frame;
+    frame_uniforms[1] = frame_data[0];  // extent
+    frame_uniforms[2] = frame_data[1];  // center[0]
+    frame_uniforms[3] = frame_data[2];  // center[1]
+}
+
+void app_hide_frame(App* app, int index) {
+    float* frame_uniforms = index ? app->gfx.uniforms.frame_b : app->gfx.uniforms.frame_a;
+    frame_uniforms[0] = 0.0f;
 }
 
 void app_show_frame(App* app, int index) {
-    // TODO: show the frame as a vertical or horizontal bar, then fade it out.
+    const parcc_config config = parcc_get_config(app->camera_controller);
+    float* frame_uniforms = index ? app->gfx.uniforms.frame_b : app->gfx.uniforms.frame_a;
+    frame_uniforms[0] = (float)((int)config.fov_orientation + 1);
 }

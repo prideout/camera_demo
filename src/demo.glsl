@@ -7,6 +7,9 @@ uniform mat4 modelview;
 uniform mat4 inverse_modelview;
 uniform mat4 projection;
 
+uniform vec2 map_extent;
+uniform vec2 map_center;
+
 out vec3 vnormal;
 out vec2 vuv;
 out float vdepth;

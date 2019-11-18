@@ -19,12 +19,16 @@ typedef struct {
     float modelview[16];
     float inverse_mv[16];
     float projection[16];
+    float map_extent[2];
+    float map_center[2];
 } Uniforms;
 
 typedef struct {
     Uniforms uniforms;
-    sg_pipeline pipeline;
-    sg_bindings bindings;
+    sg_pipeline terrain_pipeline;
+    sg_pipeline ocean_pipeline;
+    sg_bindings terrain_bindings;
+    sg_bindings ocean_bindings;
     sg_image_desc texture_desc;
     sg_image texture;
     int num_elements;

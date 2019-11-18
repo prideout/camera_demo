@@ -79,10 +79,15 @@ static void create_mesh(App* app, const char* filename) {
         .type = SG_BUFFERTYPE_INDEXBUFFER,
     });
 
-    app->gfx.bindings = (sg_bindings){
+    app->gfx.terrain_bindings = (sg_bindings){
         .vertex_buffers[0] = positions_buffer,
         .fs_images[0] = app->gfx.texture,
         .index_buffer = index_buffer,
+    };
+
+    app->gfx.ocean_bindings = (sg_bindings){
+        .vertex_buffers[0] = positions_buffer,
+        .fs_images[0] = app->gfx.texture,
     };
 
     app->gfx.num_elements = mesh->ntriangles * 3;
@@ -191,6 +196,11 @@ void app_init(App* app) {
     parcc_float center[3];
     float3_lerp(center, aabb.min_corner, aabb.max_corner, 0.5);
 
+    app->gfx.uniforms.map_extent[0] = extent[0];
+    app->gfx.uniforms.map_extent[1] = extent[1];
+    app->gfx.uniforms.map_center[0] = center[0];
+    app->gfx.uniforms.map_center[1] = center[1];
+
     const parcc_config config = {
         .mode = PARCC_MAP,
         .viewport_width = sapp_width() - kSidebarWidth,
@@ -211,27 +221,64 @@ void app_init(App* app) {
     parsh_context* shaders = parsh_create_context_from_file("src/demo.glsl");
     parsh_add_block(shaders, "prefix", "#version 330\n");
 
-    sg_shader program = sg_make_shader(&(sg_shader_desc){
-        .vs.uniform_blocks[0].size = sizeof(Uniforms),
-        .vs.uniform_blocks[0].uniforms[0].name = "modelview",
-        .vs.uniform_blocks[0].uniforms[0].type = SG_UNIFORMTYPE_MAT4,
-        .vs.uniform_blocks[0].uniforms[1].name = "inverse_modelview",
-        .vs.uniform_blocks[0].uniforms[1].type = SG_UNIFORMTYPE_MAT4,
-        .vs.uniform_blocks[0].uniforms[2].name = "projection",
-        .vs.uniform_blocks[0].uniforms[2].type = SG_UNIFORMTYPE_MAT4,
+    sg_shader_uniform_block_desc block = {
+        .size = sizeof(Uniforms),
+        .uniforms[0].name = "modelview",
+        .uniforms[0].type = SG_UNIFORMTYPE_MAT4,
+        .uniforms[1].name = "inverse_modelview",
+        .uniforms[1].type = SG_UNIFORMTYPE_MAT4,
+        .uniforms[2].name = "projection",
+        .uniforms[2].type = SG_UNIFORMTYPE_MAT4,
+        .uniforms[3].name = "world_extent",
+        .uniforms[3].type = SG_UNIFORMTYPE_FLOAT2,
+        .uniforms[4].name = "world_center",
+        .uniforms[4].type = SG_UNIFORMTYPE_FLOAT2,
+    };
+
+    sg_shader terrain_program = sg_make_shader(&(sg_shader_desc){
+        .vs.uniform_blocks[0] = block,
         .fs.images[0].name = "terrain",
         .fs.images[0].type = SG_IMAGETYPE_2D,
         .vs.source = parsh_get_blocks(shaders, "prefix terrain.vs"),
         .fs.source = parsh_get_blocks(shaders, "prefix terrain.fs"),
     });
 
-    app->gfx.pipeline = sg_make_pipeline(&(sg_pipeline_desc){
-        .shader = program,
+    app->gfx.terrain_pipeline = sg_make_pipeline(&(sg_pipeline_desc){
+        .shader = terrain_program,
         .blend.enabled = false,
         .depth_stencil.depth_compare_func = SG_COMPAREFUNC_LESS,
         .depth_stencil.depth_write_enabled = true,
         .rasterizer.cull_mode = SG_CULLMODE_NONE,
         .index_type = SG_INDEXTYPE_UINT16,
+        .layout.attrs[0].format = SG_VERTEXFORMAT_FLOAT3,
+        .layout.attrs[0].buffer_index = 0,
+    });
+
+    sg_shader ocean_program = sg_make_shader(&(sg_shader_desc){
+        .vs.uniform_blocks[0] = block,
+        .fs.images[0].name = "ocean",
+        .fs.images[0].type = SG_IMAGETYPE_2D,
+        .vs.source = parsh_get_blocks(shaders, "prefix terrain.vs"),
+        .fs.source = parsh_get_blocks(shaders, "prefix terrain.fs"),
+    });
+
+    app->gfx.terrain_pipeline = sg_make_pipeline(&(sg_pipeline_desc){
+        .shader = terrain_program,
+        .blend.enabled = false,
+        .depth_stencil.depth_compare_func = SG_COMPAREFUNC_LESS,
+        .depth_stencil.depth_write_enabled = true,
+        .rasterizer.cull_mode = SG_CULLMODE_NONE,
+        .index_type = SG_INDEXTYPE_UINT16,
+        .layout.attrs[0].format = SG_VERTEXFORMAT_FLOAT3,
+        .layout.attrs[0].buffer_index = 0,
+    });
+
+    app->gfx.ocean_pipeline = sg_make_pipeline(&(sg_pipeline_desc){
+        .shader = ocean_program,
+        .blend.enabled = false,
+        .depth_stencil.depth_compare_func = SG_COMPAREFUNC_LESS,
+        .depth_stencil.depth_write_enabled = true,
+        .rasterizer.cull_mode = SG_CULLMODE_NONE,
         .layout.attrs[0].format = SG_VERTEXFORMAT_FLOAT3,
         .layout.attrs[0].buffer_index = 0,
     });
@@ -277,8 +324,8 @@ void app_draw(App* app) {
 
     sg_begin_default_pass(&pass_action, sapp_width(), sapp_height());
     sg_apply_viewport(kSidebarWidth, 0, vp_width, vp_height, false);
-    sg_apply_pipeline(app->gfx.pipeline);
-    sg_apply_bindings(&app->gfx.bindings);
+    sg_apply_pipeline(app->gfx.terrain_pipeline);
+    sg_apply_bindings(&app->gfx.terrain_bindings);
     sg_apply_uniforms(SG_SHADERSTAGE_VS, 0, &app->gfx.uniforms, sizeof(Uniforms));
     sg_draw(0, app->gfx.num_elements, 1);
 

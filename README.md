@@ -15,8 +15,7 @@ https://github.com/prideout/camera_demo
 
 # TODO
 
-- orbit mode
-    - I think the aabb should be replaced with a fallback sphere
+- implement ORBIT mode: get_home, get_current, goto_frame
 
 - change mouse cursor during pan / zoom
 

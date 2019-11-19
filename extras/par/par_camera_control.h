@@ -113,11 +113,6 @@ typedef struct {
 } parcc_frame;
 
 typedef struct {
-    parcc_float min_corner[3];
-    parcc_float max_corner[3];
-} parcc_aabb;
-
-typedef struct {
     parcc_float min_value;
     parcc_float max_value;
 } parcc_range;
@@ -151,7 +146,7 @@ typedef struct {
     parcc_float home_target[3];  // world-space coordinate, defaults to (0,0,0)
     parcc_float home_upward[3];  // unit-length vector, defaults to (0,1,0)
 
-    parcc_aabb orbit_aabb;                       // TODO: replace with sphere
+    parcc_float orbit_radius;  // radius of grabbable sphere centered at home_target
     parcc_range orbit_constraint_theta_degrees;  // Y axis rotation, defaults to [-inf,+inf]
     parcc_range orbit_constraint_phi_degrees;    // X axis rotation, defaults to [-89, +89]
 } parcc_properties;
@@ -243,8 +238,8 @@ struct parcc_context_s {
     parcc_float grab_point_target[3];
 };
 
-static bool parcc_raycast_aabb(const parcc_float origin[3], const parcc_float dir[3],
-                               parcc_float* t, void* userdata);
+static bool parcc_raycast_sphere(const parcc_float origin[3], const parcc_float dir[3],
+                                 parcc_float* t, void* userdata);
 
 static bool parcc_raycast_plane(const parcc_float origin[3], const parcc_float dir[3],
                                 parcc_float* t, void* userdata);
@@ -467,7 +462,7 @@ bool parcc_do_raycast(parcc_context* context, int winx, int winy, parcc_float re
     // Invoke the user's callback or fallback function.
     parcc_raycast_fn callback = context->props.raycast_function;
     parcc_raycast_fn fallback =
-        context->props.mode == PARCC_ORBIT ? parcc_raycast_aabb : parcc_raycast_plane;
+        context->props.mode == PARCC_ORBIT ? parcc_raycast_sphere : parcc_raycast_plane;
     void* userdata = context->props.raycast_userdata;
     if (!callback) {
         callback = fallback;
@@ -492,6 +487,8 @@ bool parcc_do_raycast(parcc_context* context, int winx, int winy, parcc_float re
 
 parcc_frame parcc_get_current_frame(const parcc_context* context) {
     parcc_frame result = {0};
+    result.mode = context->props.mode;
+
     if (context->props.mode == PARCC_MAP) {
         const parcc_float* origin = context->eyepos;
         const parcc_float* upward = context->props.home_upward;
@@ -532,11 +529,13 @@ parcc_frame parcc_get_home_frame(const parcc_context* context) {
     const parcc_float width = context->props.viewport_width;
     const parcc_float height = context->props.viewport_height;
     const parcc_float aspect = width / height;
-    const parcc_float map_width = context->props.map_extent[0] / 2;
-    const parcc_float map_height = context->props.map_extent[1] / 2;
 
     parcc_frame frame;
+    frame.mode = context->props.mode;
+
     if (context->props.mode == PARCC_MAP) {
+        const parcc_float map_width = context->props.map_extent[0] / 2;
+        const parcc_float map_height = context->props.map_extent[1] / 2;
         const bool horiz = context->props.fov_orientation == PARCC_HORIZONTAL;
         frame.extent = horiz ? context->props.map_extent[0] : context->props.map_extent[1];
         frame.center[0] = 0;
@@ -558,6 +557,23 @@ parcc_frame parcc_get_home_frame(const parcc_context* context) {
             }
         }
     }
+
+    if (context->props.mode == PARCC_ORBIT) {
+        const parcc_float orbit_radius = context->props.orbit_radius;
+        const bool horiz = context->props.fov_orientation == PARCC_HORIZONTAL;
+        frame.theta = 0;
+        frame.theta = 0;
+        if (horiz) {
+            parcc_float vp_width = frame.extent / 2;
+            parcc_float vp_height = vp_width / aspect;
+            frame.extent = 2 * orbit_radius * aspect;
+        } else {
+            parcc_float vp_height = frame.extent / 2;
+            parcc_float vp_width = vp_height * aspect;
+            frame.extent = 2 * orbit_radius / aspect;
+        }
+    }
+
     return frame;
 }
 
@@ -638,64 +654,9 @@ double parcc_get_interpolation_duration(parcc_frame a, parcc_frame b) {
     return fabs(S);
 }
 
-static bool parcc_raycast_aabb(const parcc_float origin[3], const parcc_float dir[3],
-                               parcc_float* t, void* userdata) {
-    typedef struct parcc_vec3 {
-        parcc_float x, y, z;
-    } parcc_vec3;
+static bool parcc_raycast_sphere(const parcc_float origin[3], const parcc_float dir[3],
+                                 parcc_float* t, void* userdata) {
     parcc_context* context = (parcc_context*)userdata;
-    const parcc_vec3 minc = *((parcc_vec3*)context->props.orbit_aabb.min_corner);
-    const parcc_vec3 maxc = *((parcc_vec3*)context->props.orbit_aabb.max_corner);
-
-    // The front face is defined in CCW order and the back face is defined in CW order.
-    // Both start at the lower-left corner.
-
-    const parcc_float fr[4][3] = {
-        {minc.x, minc.y, maxc.z},
-        {maxc.x, minc.y, maxc.z},
-        {maxc.x, maxc.y, maxc.z},
-        {minc.x, maxc.y, maxc.z},
-    };
-
-    const parcc_float bk[4][3] = {
-        {minc.x, minc.y, minc.z},
-        {minc.x, maxc.y, minc.z},
-        {maxc.x, maxc.y, minc.z},
-        {maxc.x, minc.y, minc.z},
-    };
-
-    float u, v;
-
-    // Front
-    if (intersect_quad(origin, dir, fr[0], fr[1], fr[2], fr[3], t, &u, &v)) {
-        return true;
-    }
-
-    // Back
-    if (intersect_quad(origin, dir, bk[0], bk[1], bk[2], bk[3], t, &u, &v)) {
-        return true;
-    }
-
-    // Right
-    if (intersect_quad(origin, dir, fr[2], fr[1], bk[3], bk[2], t, &u, &v)) {
-        return true;
-    }
-
-    // Left
-    if (intersect_quad(origin, dir, fr[3], bk[1], bk[0], fr[0], t, &u, &v)) {
-        return true;
-    }
-
-    // Bottom
-    if (intersect_quad(origin, dir, bk[0], bk[3], fr[1], fr[0], t, &u, &v)) {
-        return true;
-    }
-
-    // Top
-    if (intersect_quad(origin, dir, bk[1], fr[3], fr[2], bk[2], t, &u, &v)) {
-        return true;
-    }
-
     return false;
 }
 

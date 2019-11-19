@@ -94,3 +94,66 @@ bool intersect_quad(const float orig[3], const float dir[3], const float sw[3], 
     }
     return false;
 }
+
+#if 0
+static bool parcc_raycast_aabb(const parcc_float origin[3], const parcc_float dir[3],
+                               parcc_float* t, void* userdata) {
+    typedef struct parcc_vec3 {
+        parcc_float x, y, z;
+    } parcc_vec3;
+    parcc_context* context = (parcc_context*)userdata;
+    const parcc_vec3 minc = *((parcc_vec3*)context->props.orbit_aabb.min_corner);
+    const parcc_vec3 maxc = *((parcc_vec3*)context->props.orbit_aabb.max_corner);
+
+    // The front face is defined in CCW order and the back face is defined in CW order.
+    // Both start at the lower-left corner.
+
+    const parcc_float fr[4][3] = {
+        {minc.x, minc.y, maxc.z},
+        {maxc.x, minc.y, maxc.z},
+        {maxc.x, maxc.y, maxc.z},
+        {minc.x, maxc.y, maxc.z},
+    };
+
+    const parcc_float bk[4][3] = {
+        {minc.x, minc.y, minc.z},
+        {minc.x, maxc.y, minc.z},
+        {maxc.x, maxc.y, minc.z},
+        {maxc.x, minc.y, minc.z},
+    };
+
+    float u, v;
+
+    // Front
+    if (intersect_quad(origin, dir, fr[0], fr[1], fr[2], fr[3], t, &u, &v)) {
+        return true;
+    }
+
+    // Back
+    if (intersect_quad(origin, dir, bk[0], bk[1], bk[2], bk[3], t, &u, &v)) {
+        return true;
+    }
+
+    // Right
+    if (intersect_quad(origin, dir, fr[2], fr[1], bk[3], bk[2], t, &u, &v)) {
+        return true;
+    }
+
+    // Left
+    if (intersect_quad(origin, dir, fr[3], bk[1], bk[0], fr[0], t, &u, &v)) {
+        return true;
+    }
+
+    // Bottom
+    if (intersect_quad(origin, dir, bk[0], bk[3], fr[1], fr[0], t, &u, &v)) {
+        return true;
+    }
+
+    // Top
+    if (intersect_quad(origin, dir, bk[1], fr[3], fr[2], bk[2], t, &u, &v)) {
+        return true;
+    }
+
+    return false;
+}
+#endif

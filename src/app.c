@@ -183,18 +183,13 @@ void app_init(App* app) {
     app->raytracer = part_create_context((part_config){.bin_size = 5}, mesh);
     printf("Created raytracer BVH in %.0f ms\n", stm_ms(stm_diff(stm_now(), start_bvh)));
 
-    const parcc_aabb aabb = {
-        {app->min_corner[0], app->min_corner[1], app->min_corner[2]},
-        {app->max_corner[0], app->max_corner[1], app->max_corner[2]},
-    };
-
     const parcc_float extent[2] = {
         app->max_corner[0] - app->min_corner[0],
         app->max_corner[1] - app->min_corner[1],
     };
 
     parcc_float center[3];
-    float3_lerp(center, aabb.min_corner, aabb.max_corner, 0.5);
+    float3_lerp(center, app->min_corner, app->max_corner, 0.5);
 
     app->gfx.uniforms.map_extent[0] = extent[0];
     app->gfx.uniforms.map_extent[1] = extent[1];
@@ -213,7 +208,7 @@ void app_init(App* app) {
         .raycast_function = app_intersects_mesh,
         .raycast_userdata = (void*)app,
         .home_target = {center[0], center[1], 0},
-        .orbit_aabb = aabb,
+        .orbit_radius = fmax(extent[0], extent[1]) / 2.0,
     };
     app->camera_controller = parcc_create_context(&props);
 

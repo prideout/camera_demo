@@ -15,10 +15,7 @@ https://github.com/prideout/camera_demo
 
 # TODO
 
-- more API cleanup
-    - parcc_frame should perhaps be an opaque structure
-        - could be a 4-tuple of floats (mode + 3 data fields) that gets casted to 1 of 2 types
-    - I guess the config should not be passed by value. (play with coliru?)
+- config should not be passed by value
 
 - orbit mode
     - I think the aabb should be replaced with a fallback sphere

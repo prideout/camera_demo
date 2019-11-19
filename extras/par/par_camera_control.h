@@ -84,7 +84,7 @@ typedef enum {
 
 // Pan and zoom constraints for MAP mode.
 typedef enum {
-    // No constraints except that map_min_distance are still enforced.
+    // No constraints except that map_min_distance is still enforced.
     PARCC_CONSTRAIN_NONE,
 
     // Constrains pan and zoom to limit the viewport's extent along the FOV axis so that it always
@@ -98,16 +98,18 @@ typedef enum {
     PARCC_CONSTRAIN_FULL,
 } parcc_constraint;
 
-// Captured camera state used for animation and bookmarks.
+// Captured camera state used for Van Wijk animation and bookmarks.
+// From the user's perspective, this should be treated as an opaque structure.
 typedef struct {
-    // Van Wijk parameters for MAP mode
-    parcc_float extent;     // world-space width or height, depending on fov_orientation
-    parcc_float center[2];  // vector from home_target that gets projected to map_plane
-
-    // Radius and euler angles for ORBIT mode. Nope, does not use quaternions
-    parcc_float radius;  // world-space distance between home_target and camera
-    parcc_float theta;   // Y axis rotation (applied first)
-    parcc_float phi;     // X axis rotation (applied second)
+    parcc_mode mode;
+    parcc_float extent;
+    union {
+        parcc_float center[2];
+        struct {
+            parcc_float theta;
+            parcc_float phi;  // this is typically constrained to [-pi/2, +pi/2]
+        };
+    };
 } parcc_frame;
 
 typedef struct {
@@ -120,6 +122,7 @@ typedef struct {
     parcc_float max_value;
 } parcc_range;
 
+// Optional user-provided ray casting function to enable precise panning behavior.
 typedef bool (*parcc_raycast_fn)(const parcc_float origin[3], const parcc_float dir[3],
                                  parcc_float* t, void* userdata);
 
@@ -133,7 +136,7 @@ typedef struct {
     parcc_float near_plane;  // distance between camera and near clipping plane
     parcc_float far_plane;   // distance between camera and far clipping plane
 
-    parcc_float map_extent[2];        // constraints for map_plane (centered at home_target)
+    parcc_float map_extent[2];        // size constraint for map_plane (centered at home_target)
     parcc_float map_plane[4];         // plane equation with normalized XYZ, defaults to (0,0,1,0)
     parcc_constraint map_constraint;  // defaults to PARCC_CONSTRAIN_NONE
     parcc_float map_min_distance;     // constrains zoom using distance between camera and plane
@@ -153,14 +156,16 @@ typedef struct {
     parcc_range orbit_constraint_phi_degrees;    // X axis rotation, defaults to [-89, +89]
 } parcc_config;
 
-// Opaque handle to a camera controller and its memory arena.
+// Opaque handle to a camera controller.
 typedef struct parcc_context_s parcc_context;
 
-// Context and configuration functions.
+// Context constructor and destructor.
 parcc_context* parcc_create_context(parcc_config config);
-parcc_config parcc_get_config(const parcc_context* context);
-void parcc_set_config(parcc_context* context, parcc_config config);
 void parcc_destroy_context(parcc_context* ctx);
+
+// Property setters and getters.
+void parcc_set_config(parcc_context* context, parcc_config config);
+parcc_config parcc_get_config(const parcc_context* context);
 
 // Camera retrieval functions.
 void parcc_get_look_at(const parcc_context* ctx,  //
@@ -180,13 +185,13 @@ void parcc_get_matrices(const parcc_context* ctx,    //
 //
 // The scrolldelta argument is used for zooming; positive indicates "zoom in". This gets scaled by
 // zoom_speed. Zoom speed is also scaled by distance-to-ground. To prevent zooming in too far, use a
-// non-zero value for min_distance.
+// non-zero value for map_min_distance.
 void parcc_grab_begin(parcc_context* context, int winx, int winy);
 void parcc_grab_update(parcc_context* context, int winx, int winy, parcc_float scrolldelta);
 void parcc_grab_end(parcc_context* context);
 bool parcc_do_raycast(parcc_context* context, int winx, int winy, parcc_float result[3]);
 
-// Frames (captured controller states) and Van Wijk interpolation functions.
+// Frames (simplified camera states for bookmarking) and Van Wijk interpolation functions.
 parcc_frame parcc_get_current_frame(const parcc_context* context);
 parcc_frame parcc_get_home_frame(const parcc_context* context);
 void parcc_goto_frame(parcc_context* context, parcc_frame state);
@@ -216,11 +221,21 @@ double parcc_get_interpolation_duration(parcc_frame a, parcc_frame b);
 #define PARCC_CALLOC(T, N) ((T*)calloc(N * sizeof(T), 1))
 #define PARCC_FREE(BUF) free(BUF)
 
+// Implementation note about the "parcc_frame" POD. This is a simplified representation of the
+// camera state:
+//
+// - zoom level is represented with the extent of the rectangle formed by the intersection of the
+//   frustum with the viewing plane at home_target. It is either a width or a height, depending on
+//   fov_orientation.
+//
+// - In MAP mode, pan is stored as a 2D vector from home_target that gets projected to map_plane.
+//
+// - In ORBIT mode, pan is represented with lat-long angles in radians.
+
 struct parcc_context_s {
     parcc_config config;
     parcc_float eyepos[3];
     parcc_float target[3];
-    parcc_float upward[3];
     bool grabbing;
     parcc_float grab_point_far[3];
     parcc_float grab_point_world[3];
@@ -281,11 +296,7 @@ void parcc_set_config(parcc_context* context, parcc_config config) {
 
     if (more_constrained || orientation_changed ||
         (viewport_resized && context->config.map_constraint == PARCC_CONSTRAIN_FULL)) {
-        parcc_float eyepos[3];
-        parcc_float target[3];
-        parcc_float upward[3];
-        parcc_get_look_at(context, eyepos, target, upward);
-        parcc_move_with_constraints(context, eyepos, target);
+        parcc_move_with_constraints(context, context->eyepos, context->target);
     }
 }
 
@@ -293,7 +304,19 @@ void parcc_destroy_context(parcc_context* context) { PARCC_FREE(context); }
 
 void parcc_get_matrices(const parcc_context* context, parcc_float projection[16],
                         parcc_float view[16]) {
-    float16_look_at(view, context->eyepos, context->target, context->upward);
+    parcc_float gaze[3];
+    float3_subtract(gaze, context->target, context->eyepos);
+    float3_normalize(gaze);
+
+    parcc_float right[3];
+    float3_cross(right, gaze, context->config.home_upward);
+    float3_normalize(right);
+
+    parcc_float upward[3];
+    float3_cross(upward, right, gaze);
+    float3_normalize(upward);
+
+    float16_look_at(view, context->eyepos, context->target, upward);
     const parcc_config cfg = context->config;
     const parcc_float aspect = (parcc_float)cfg.viewport_width / cfg.viewport_height;
     const parcc_float fov = cfg.fov_degrees;
@@ -308,7 +331,18 @@ void parcc_get_look_at(const parcc_context* ctx, parcc_float eyepos[3], parcc_fl
                        parcc_float upward[3]) {
     float3_copy(eyepos, ctx->eyepos);
     float3_copy(target, ctx->target);
-    float3_copy(upward, ctx->upward);
+    if (upward) {
+        parcc_float gaze[3];
+        float3_subtract(gaze, ctx->target, ctx->eyepos);
+        float3_normalize(gaze);
+
+        parcc_float right[3];
+        float3_cross(right, gaze, ctx->config.home_upward);
+        float3_normalize(right);
+
+        float3_cross(upward, right, gaze);
+        float3_normalize(upward);
+    }
 }
 
 void parcc_grab_begin(parcc_context* context, int winx, int winy) {
@@ -400,7 +434,7 @@ bool parcc_do_raycast(parcc_context* context, int winx, int winy, parcc_float re
     float3_normalize(gaze);
 
     parcc_float right[3];
-    float3_cross(right, gaze, context->upward);
+    float3_cross(right, gaze, context->config.home_upward);
     float3_normalize(right);
 
     parcc_float upward[3];
@@ -553,9 +587,6 @@ void parcc_goto_frame(parcc_context* context, parcc_frame frame) {
         // position.
         float3_scale(target_to_eye, distance);
         float3_add(context->eyepos, context->target, target_to_eye);
-
-        // The up vector should never change, but just for completeness go ahead and set it.
-        float3_copy(context->upward, upward);
     }
 }
 
@@ -698,7 +729,7 @@ static void parcc_get_ray_far(parcc_context* context, int winx, int winy, parcc_
     float3_normalize(gaze);
 
     parcc_float right[3];
-    float3_cross(right, gaze, context->upward);
+    float3_cross(right, gaze, context->config.home_upward);
     float3_normalize(right);
 
     parcc_float upward[3];

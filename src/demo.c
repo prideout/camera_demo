@@ -17,12 +17,13 @@ static void handler(const sapp_event* event) {
     const float vpheight = sapp_height();
     const int winx = (event->mouse_x - kSidebarWidth);
     const int winy = vpheight - 1 - event->mouse_y;
+    parcc_properties props;
     switch (event->type) {
         case SAPP_EVENTTYPE_RESIZED: {
-            parcc_config config = parcc_get_config(app.camera_controller);
-            config.viewport_width = vpwidth;
-            config.viewport_height = vpheight;
-            parcc_set_config(app.camera_controller, config);
+            parcc_get_properties(app.camera_controller, &props);
+            props.viewport_width = vpwidth;
+            props.viewport_height = vpheight;
+            parcc_set_properties(app.camera_controller, &props);
             break;
         }
         case SAPP_EVENTTYPE_MOUSE_DOWN: {

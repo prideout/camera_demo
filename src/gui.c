@@ -94,34 +94,34 @@ static void define_ui(Gui* gui) {
 
     mu_begin_window_ex(ctx, &gui->window, "", MU_OPT_NOTITLE | MU_OPT_NORESIZE);
 
-    static parcc_config config;
-    config = parcc_get_config(camera);
+    static parcc_properties props;
+    parcc_get_properties(camera, &props);
 
     mu_layout_row(ctx, 2, (int[]){142, -1}, 0);
     mux_radio_buttons((mux_Button[]){{"Orbit mode", PARCC_ORBIT},  //
                                      {"Map mode", PARCC_MAP}},     //
-                      ctx, (int*)&config.mode, 2);
+                      ctx, (int*)&props.mode, 2);
 
     mux_radio_buttons((mux_Button[]){{"Vertical FOV", PARCC_VERTICAL},       //
                                      {"Horizontal FOV", PARCC_HORIZONTAL}},  //
-                      ctx, (int*)&config.fov_orientation, 2);
+                      ctx, (int*)&props.fov_orientation, 2);
 
-    if (config.mode == PARCC_MAP) {
+    if (props.mode == PARCC_MAP) {
         mu_layout_row(ctx, 3, (int[]){93, 93, 93}, 0);
         mux_radio_buttons((mux_Button[]){{"No constraint", PARCC_VERTICAL},
                                          {"Axis constraint", PARCC_CONSTRAIN_AXIS},
                                          {"Full constraint", PARCC_CONSTRAIN_FULL}},
-                          ctx, (int*)&config.map_constraint, 3);
+                          ctx, (int*)&props.map_constraint, 3);
     }
 
     mu_layout_row(ctx, 2, (int[]){85, -1}, 0);
     mu_label(ctx, "FOV Degrees");
-    mu_slider(ctx, &config.fov_degrees, 10, 90);
+    mu_slider(ctx, &props.fov_degrees, 10, 90);
 
     mu_layout_row(ctx, 1, (int[]){-1}, 0);
-    int raycast = config.raycast_function == app_intersects_mesh;
+    int raycast = props.raycast_function == app_intersects_mesh;
     mu_checkbox(ctx, &raycast, "Raycast with mesh for precise zoom / pan");
-    config.raycast_function = raycast ? app_intersects_mesh : NULL;
+    props.raycast_function = raycast ? app_intersects_mesh : NULL;
 
     mu_layout_row(ctx, 1, (int[]){-1}, 0);
     snprintf(buf, 128, "Camera position: %.03g, %.03g, %.03g", eyepos[0], eyepos[1], eyepos[2]);
@@ -164,7 +164,7 @@ static void define_ui(Gui* gui) {
 
     mu_end_window(ctx);
 
-    parcc_set_config(camera, config);
+    parcc_set_properties(camera, &props);
     mu_end(ctx);
 }
 

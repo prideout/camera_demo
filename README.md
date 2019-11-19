@@ -15,8 +15,6 @@ https://github.com/prideout/camera_demo
 
 # TODO
 
-- config should not be passed by value
-
 - orbit mode
     - I think the aabb should be replaced with a fallback sphere
 

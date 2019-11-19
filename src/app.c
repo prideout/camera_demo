@@ -201,7 +201,7 @@ void app_init(App* app) {
     app->gfx.uniforms.map_center[0] = center[0];
     app->gfx.uniforms.map_center[1] = center[1];
 
-    const parcc_config config = {
+    const parcc_properties props = {
         .mode = PARCC_MAP,
         .viewport_width = sapp_width() - kSidebarWidth,
         .viewport_height = sapp_height(),
@@ -215,7 +215,7 @@ void app_init(App* app) {
         .home_target = {center[0], center[1], 0},
         .orbit_aabb = aabb,
     };
-    app->camera_controller = parcc_create_context(config);
+    app->camera_controller = parcc_create_context(&props);
 
     app->gui = gui_create(app, kSidebarWidth);
 

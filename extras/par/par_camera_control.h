@@ -26,7 +26,7 @@
 //        ...
 //     }
 //
-//     parcc_context* controller = parc_create_context((parcc_config) {
+//     parcc_context* controller = parc_create_context(&(parcc_properties) {
 //         .mode = PARCC_MAP,
 //         .viewport_width = 1024,
 //         .viewport_height = 768,
@@ -126,7 +126,7 @@ typedef struct {
 typedef bool (*parcc_raycast_fn)(const parcc_float origin[3], const parcc_float dir[3],
                                  parcc_float* t, void* userdata);
 
-// The config structure represents all user-controlled state in the library.
+// The properties structure represents all user-controlled state in the library.
 // The first few fields must be provided, but all remaining fields fall back to reasonable default
 // values when they are zero-filled.
 typedef struct {
@@ -154,18 +154,18 @@ typedef struct {
     parcc_aabb orbit_aabb;                       // TODO: replace with sphere
     parcc_range orbit_constraint_theta_degrees;  // Y axis rotation, defaults to [-inf,+inf]
     parcc_range orbit_constraint_phi_degrees;    // X axis rotation, defaults to [-89, +89]
-} parcc_config;
+} parcc_properties;
 
 // Opaque handle to a camera controller.
 typedef struct parcc_context_s parcc_context;
 
 // Context constructor and destructor.
-parcc_context* parcc_create_context(parcc_config config);
+parcc_context* parcc_create_context(const parcc_properties* props);
 void parcc_destroy_context(parcc_context* ctx);
 
 // Property setters and getters.
-void parcc_set_config(parcc_context* context, parcc_config config);
-parcc_config parcc_get_config(const parcc_context* context);
+void parcc_set_properties(parcc_context* context, const parcc_properties* props);
+void parcc_get_properties(const parcc_context* context, parcc_properties* out);
 
 // Camera retrieval functions.
 void parcc_get_look_at(const parcc_context* ctx,  //
@@ -233,7 +233,7 @@ double parcc_get_interpolation_duration(parcc_frame a, parcc_frame b);
 // - In ORBIT mode, pan is represented with lat-long angles in radians.
 
 struct parcc_context_s {
-    parcc_config config;
+    parcc_properties props;
     parcc_float eyepos[3];
     parcc_float target[3];
     bool grabbing;
@@ -254,48 +254,51 @@ static void parcc_get_ray_far(parcc_context* context, int winx, int winy, parcc_
 static void parcc_move_with_constraints(parcc_context* context, const parcc_float eyepos[3],
                                         const parcc_float target[3]);
 
-parcc_context* parcc_create_context(parcc_config config) {
+parcc_context* parcc_create_context(const parcc_properties* props) {
     parcc_context* context = PARCC_CALLOC(parcc_context, 1);
-    parcc_set_config(context, config);
+    parcc_set_properties(context, props);
     parcc_goto_frame(context, parcc_get_home_frame(context));
     return context;
 }
 
-parcc_config parcc_get_config(const parcc_context* context) { return context->config; }
+void parcc_get_properties(const parcc_context* context, parcc_properties* props) {
+    *props = context->props;
+}
 
-void parcc_set_config(parcc_context* context, parcc_config config) {
-    if (config.fov_degrees == 0) {
-        config.fov_degrees = 33;
+void parcc_set_properties(parcc_context* context, const parcc_properties* pprops) {
+    parcc_properties props = *pprops;
+    if (props.fov_degrees == 0) {
+        props.fov_degrees = 33;
     }
-    if (config.zoom_speed == 0) {
-        config.zoom_speed = 0.01;
+    if (props.zoom_speed == 0) {
+        props.zoom_speed = 0.01;
     }
-    if (float3_dot(config.home_upward, config.home_upward) == 0) {
-        config.home_upward[1] = 1;
+    if (float3_dot(props.home_upward, props.home_upward) == 0) {
+        props.home_upward[1] = 1;
     }
-    if (float4_dot(config.map_plane, config.map_plane) == 0) {
-        config.map_plane[2] = 1;
+    if (float4_dot(props.map_plane, props.map_plane) == 0) {
+        props.map_plane[2] = 1;
     }
 
-    parcc_range* theta = &config.orbit_constraint_theta_degrees;
+    parcc_range* theta = &props.orbit_constraint_theta_degrees;
     if (theta->min_value == 0 && theta->max_value == 0) {
         *theta = (parcc_range){-INFINITY, INFINITY};
     }
 
-    parcc_range* phi = &config.orbit_constraint_phi_degrees;
+    parcc_range* phi = &props.orbit_constraint_phi_degrees;
     if (phi->min_value == 0 && phi->max_value == 0) {
         *phi = (parcc_range){-89, +89};
     }
 
-    bool more_constrained = (int)config.map_constraint > (int)context->config.map_constraint;
-    bool orientation_changed = config.fov_orientation != context->config.fov_orientation;
-    bool viewport_resized = config.viewport_height != context->config.viewport_height ||
-                            config.viewport_width != context->config.viewport_width;
+    const bool more_constrained = (int)props.map_constraint > (int)context->props.map_constraint;
+    const bool orientation_changed = props.fov_orientation != context->props.fov_orientation;
+    const bool viewport_resized = props.viewport_height != context->props.viewport_height ||
+                                  props.viewport_width != context->props.viewport_width;
 
-    context->config = config;
+    context->props = props;
 
     if (more_constrained || orientation_changed ||
-        (viewport_resized && context->config.map_constraint == PARCC_CONSTRAIN_FULL)) {
+        (viewport_resized && context->props.map_constraint == PARCC_CONSTRAIN_FULL)) {
         parcc_move_with_constraints(context, context->eyepos, context->target);
     }
 }
@@ -309,7 +312,7 @@ void parcc_get_matrices(const parcc_context* context, parcc_float projection[16]
     float3_normalize(gaze);
 
     parcc_float right[3];
-    float3_cross(right, gaze, context->config.home_upward);
+    float3_cross(right, gaze, context->props.home_upward);
     float3_normalize(right);
 
     parcc_float upward[3];
@@ -317,13 +320,13 @@ void parcc_get_matrices(const parcc_context* context, parcc_float projection[16]
     float3_normalize(upward);
 
     float16_look_at(view, context->eyepos, context->target, upward);
-    const parcc_config cfg = context->config;
-    const parcc_float aspect = (parcc_float)cfg.viewport_width / cfg.viewport_height;
-    const parcc_float fov = cfg.fov_degrees;
-    if (context->config.fov_orientation == PARCC_HORIZONTAL) {
-        float16_perspective_x(projection, fov, aspect, cfg.near_plane, cfg.far_plane);
+    const parcc_properties props = context->props;
+    const parcc_float aspect = (parcc_float)props.viewport_width / props.viewport_height;
+    const parcc_float fov = props.fov_degrees;
+    if (context->props.fov_orientation == PARCC_HORIZONTAL) {
+        float16_perspective_x(projection, fov, aspect, props.near_plane, props.far_plane);
     } else {
-        float16_perspective_y(projection, fov, aspect, cfg.near_plane, cfg.far_plane);
+        float16_perspective_y(projection, fov, aspect, props.near_plane, props.far_plane);
     }
 }
 
@@ -337,7 +340,7 @@ void parcc_get_look_at(const parcc_context* ctx, parcc_float eyepos[3], parcc_fl
         float3_normalize(gaze);
 
         parcc_float right[3];
-        float3_cross(right, gaze, ctx->config.home_upward);
+        float3_cross(right, gaze, ctx->props.home_upward);
         float3_normalize(right);
 
         float3_cross(upward, right, gaze);
@@ -400,7 +403,7 @@ void parcc_grab_update(parcc_context* context, int winx, int winy, parcc_float s
         // Prevent getting stuck; this needs to be done regardless
         // of the user's min_distance setting, which is enforced in
         // parcc_move_with_constraints.
-        const parcc_float zoom_speed = context->config.zoom_speed;
+        const parcc_float zoom_speed = context->props.zoom_speed;
         if (scrolldelta > 0.0) {
             const parcc_float distance_to_surface = float3_length(u_vec);
             if (distance_to_surface < zoom_speed) {
@@ -423,10 +426,10 @@ void parcc_grab_update(parcc_context* context, int winx, int winy, parcc_float s
 void parcc_grab_end(parcc_context* context) { context->grabbing = false; }
 
 bool parcc_do_raycast(parcc_context* context, int winx, int winy, parcc_float result[3]) {
-    const parcc_float width = context->config.viewport_width;
-    const parcc_float height = context->config.viewport_height;
-    const parcc_float fov = context->config.fov_degrees * VEC_PI / 180.0;
-    const bool vertical_fov = context->config.fov_orientation == PARCC_VERTICAL;
+    const parcc_float width = context->props.viewport_width;
+    const parcc_float height = context->props.viewport_height;
+    const parcc_float fov = context->props.fov_degrees * VEC_PI / 180.0;
+    const bool vertical_fov = context->props.fov_orientation == PARCC_VERTICAL;
     const parcc_float* origin = context->eyepos;
 
     parcc_float gaze[3];
@@ -434,7 +437,7 @@ bool parcc_do_raycast(parcc_context* context, int winx, int winy, parcc_float re
     float3_normalize(gaze);
 
     parcc_float right[3];
-    float3_cross(right, gaze, context->config.home_upward);
+    float3_cross(right, gaze, context->props.home_upward);
     float3_normalize(right);
 
     parcc_float upward[3];
@@ -462,10 +465,10 @@ bool parcc_do_raycast(parcc_context* context, int winx, int winy, parcc_float re
     float3_normalize(gaze);
 
     // Invoke the user's callback or fallback function.
-    parcc_raycast_fn callback = context->config.raycast_function;
+    parcc_raycast_fn callback = context->props.raycast_function;
     parcc_raycast_fn fallback =
-        context->config.mode == PARCC_ORBIT ? parcc_raycast_aabb : parcc_raycast_plane;
-    void* userdata = context->config.raycast_userdata;
+        context->props.mode == PARCC_ORBIT ? parcc_raycast_aabb : parcc_raycast_plane;
+    void* userdata = context->props.raycast_userdata;
     if (!callback) {
         callback = fallback;
         userdata = context;
@@ -489,9 +492,9 @@ bool parcc_do_raycast(parcc_context* context, int winx, int winy, parcc_float re
 
 parcc_frame parcc_get_current_frame(const parcc_context* context) {
     parcc_frame result = {0};
-    if (context->config.mode == PARCC_MAP) {
+    if (context->props.mode == PARCC_MAP) {
         const parcc_float* origin = context->eyepos;
-        const parcc_float* upward = context->config.home_upward;
+        const parcc_float* upward = context->props.home_upward;
 
         parcc_float direction[3];
         float3_subtract(direction, context->target, origin);
@@ -500,7 +503,7 @@ parcc_frame parcc_get_current_frame(const parcc_context* context) {
         parcc_float distance;
         parcc_raycast_plane(origin, direction, &distance, (void*)context);
 
-        const parcc_float fov = context->config.fov_degrees * VEC_PI / 180.0;
+        const parcc_float fov = context->props.fov_degrees * VEC_PI / 180.0;
         const parcc_float half_extent = distance * tan(fov / 2);
 
         parcc_float target[3];
@@ -512,11 +515,11 @@ parcc_frame parcc_get_current_frame(const parcc_context* context) {
         parcc_float vvec[3];
         parcc_float target_to_eye[3];
 
-        float3_copy(target_to_eye, context->config.map_plane);
+        float3_copy(target_to_eye, context->props.map_plane);
         float3_cross(uvec, upward, target_to_eye);
         float3_cross(vvec, target_to_eye, uvec);
 
-        float3_subtract(target, target, context->config.home_target);
+        float3_subtract(target, target, context->props.home_target);
 
         result.extent = half_extent * 2;
         result.center[0] = float3_dot(uvec, target);
@@ -526,19 +529,19 @@ parcc_frame parcc_get_current_frame(const parcc_context* context) {
 }
 
 parcc_frame parcc_get_home_frame(const parcc_context* context) {
-    const parcc_float width = context->config.viewport_width;
-    const parcc_float height = context->config.viewport_height;
+    const parcc_float width = context->props.viewport_width;
+    const parcc_float height = context->props.viewport_height;
     const parcc_float aspect = width / height;
-    const parcc_float map_width = context->config.map_extent[0] / 2;
-    const parcc_float map_height = context->config.map_extent[1] / 2;
+    const parcc_float map_width = context->props.map_extent[0] / 2;
+    const parcc_float map_height = context->props.map_extent[1] / 2;
 
     parcc_frame frame;
-    if (context->config.mode == PARCC_MAP) {
-        const bool horiz = context->config.fov_orientation == PARCC_HORIZONTAL;
-        frame.extent = horiz ? context->config.map_extent[0] : context->config.map_extent[1];
+    if (context->props.mode == PARCC_MAP) {
+        const bool horiz = context->props.fov_orientation == PARCC_HORIZONTAL;
+        frame.extent = horiz ? context->props.map_extent[0] : context->props.map_extent[1];
         frame.center[0] = 0;
         frame.center[1] = 0;
-        if (context->config.map_constraint != PARCC_CONSTRAIN_FULL) {
+        if (context->props.map_constraint != PARCC_CONSTRAIN_FULL) {
             return frame;
         }
         if (horiz) {
@@ -559,10 +562,10 @@ parcc_frame parcc_get_home_frame(const parcc_context* context) {
 }
 
 void parcc_goto_frame(parcc_context* context, parcc_frame frame) {
-    if (context->config.mode == PARCC_MAP) {
-        const parcc_float* upward = context->config.home_upward;
+    if (context->props.mode == PARCC_MAP) {
+        const parcc_float* upward = context->props.home_upward;
         const parcc_float half_extent = frame.extent / 2.0;
-        const parcc_float fov = context->config.fov_degrees * VEC_PI / 180.0;
+        const parcc_float fov = context->props.fov_degrees * VEC_PI / 180.0;
         const parcc_float distance = half_extent / tan(fov / 2);
 
         // Compute the tangent frame defined by the map_plane normal and the home_upward vector.
@@ -570,7 +573,7 @@ void parcc_goto_frame(parcc_context* context, parcc_frame frame) {
         parcc_float vvec[3];
         parcc_float target_to_eye[3];
 
-        float3_copy(target_to_eye, context->config.map_plane);
+        float3_copy(target_to_eye, context->props.map_plane);
         float3_cross(uvec, upward, target_to_eye);
         float3_cross(vvec, target_to_eye, uvec);
 
@@ -579,7 +582,7 @@ void parcc_goto_frame(parcc_context* context, parcc_frame frame) {
         float3_scale(vvec, frame.center[1]);
 
         // Obtain the new target position by adding U and V to home_target.
-        float3_copy(context->target, context->config.home_target);
+        float3_copy(context->target, context->props.home_target);
         float3_add(context->target, context->target, uvec);
         float3_add(context->target, context->target, vvec);
 
@@ -641,8 +644,8 @@ static bool parcc_raycast_aabb(const parcc_float origin[3], const parcc_float di
         parcc_float x, y, z;
     } parcc_vec3;
     parcc_context* context = (parcc_context*)userdata;
-    const parcc_vec3 minc = *((parcc_vec3*)context->config.orbit_aabb.min_corner);
-    const parcc_vec3 maxc = *((parcc_vec3*)context->config.orbit_aabb.max_corner);
+    const parcc_vec3 minc = *((parcc_vec3*)context->props.orbit_aabb.min_corner);
+    const parcc_vec3 maxc = *((parcc_vec3*)context->props.orbit_aabb.max_corner);
 
     // The front face is defined in CCW order and the back face is defined in CW order.
     // Both start at the lower-left corner.
@@ -702,7 +705,7 @@ static bool parcc_raycast_plane(const parcc_float origin[3], const parcc_float d
         parcc_float x, y, z;
     } parcc_vec3;
     parcc_context* context = (parcc_context*)userdata;
-    const parcc_float* plane = context->config.map_plane;
+    const parcc_float* plane = context->props.map_plane;
     parcc_vec3 n = {plane[0], plane[1], plane[2]};
     parcc_vec3 p0 = n;
     float3_scale(&p0.x, plane[3]);
@@ -718,10 +721,10 @@ static bool parcc_raycast_plane(const parcc_float origin[3], const parcc_float d
 
 // Finds the point on the frustum's far plane that a pick ray intersects.
 static void parcc_get_ray_far(parcc_context* context, int winx, int winy, parcc_float result[3]) {
-    const parcc_float width = context->config.viewport_width;
-    const parcc_float height = context->config.viewport_height;
-    const parcc_float fov = context->config.fov_degrees * VEC_PI / 180.0;
-    const bool vertical_fov = context->config.fov_orientation == PARCC_VERTICAL;
+    const parcc_float width = context->props.viewport_width;
+    const parcc_float height = context->props.viewport_height;
+    const parcc_float fov = context->props.fov_degrees * VEC_PI / 180.0;
+    const bool vertical_fov = context->props.fov_orientation == PARCC_VERTICAL;
     const parcc_float* origin = context->eyepos;
 
     parcc_float gaze[3];
@@ -729,7 +732,7 @@ static void parcc_get_ray_far(parcc_context* context, int winx, int winy, parcc_
     float3_normalize(gaze);
 
     parcc_float right[3];
-    float3_cross(right, gaze, context->config.home_upward);
+    float3_cross(right, gaze, context->props.home_upward);
     float3_normalize(right);
 
     parcc_float upward[3];
@@ -754,23 +757,23 @@ static void parcc_get_ray_far(parcc_context* context, int winx, int winy, parcc_
     }
     float3_add(gaze, gaze, right);
     float3_add(gaze, gaze, upward);
-    float3_scale(gaze, context->config.far_plane);
+    float3_scale(gaze, context->props.far_plane);
     float3_add(result, origin, gaze);
 }
 
 static void parcc_move_with_constraints(parcc_context* context, const parcc_float eyepos[3],
                                         const parcc_float target[3]) {
-    const parcc_constraint constraint = context->config.map_constraint;
-    const bool horizontal = context->config.fov_orientation == PARCC_HORIZONTAL;
-    const parcc_float width = context->config.viewport_width;
-    const parcc_float height = context->config.viewport_height;
+    const parcc_constraint constraint = context->props.map_constraint;
+    const bool horizontal = context->props.fov_orientation == PARCC_HORIZONTAL;
+    const parcc_float width = context->props.viewport_width;
+    const parcc_float height = context->props.viewport_height;
     const parcc_float aspect = width / height;
-    const parcc_float map_width = context->config.map_extent[0] / 2;
-    const parcc_float map_height = context->config.map_extent[1] / 2;
+    const parcc_float map_width = context->props.map_extent[0] / 2;
+    const parcc_float map_height = context->props.map_extent[1] / 2;
     const parcc_frame home = parcc_get_home_frame(context);
     const parcc_frame previous_frame = parcc_get_current_frame(context);
-    const parcc_float fov = context->config.fov_degrees * VEC_PI / 180.0;
-    const parcc_float min_extent = 2.0 * context->config.map_min_distance * tan(fov / 2);
+    const parcc_float fov = context->props.fov_degrees * VEC_PI / 180.0;
+    const parcc_float min_extent = 2.0 * context->props.map_min_distance * tan(fov / 2);
 
     float3_copy(context->eyepos, eyepos);
     float3_copy(context->target, target);
@@ -791,7 +794,7 @@ static void parcc_move_with_constraints(parcc_context* context, const parcc_floa
     parcc_float x = frame.center[0];
     parcc_float y = frame.center[1];
 
-    if (context->config.fov_orientation == PARCC_HORIZONTAL) {
+    if (context->props.fov_orientation == PARCC_HORIZONTAL) {
         parcc_float vp_width = frame.extent / 2;
         parcc_float vp_height = vp_width / aspect;
         if (map_width < vp_width) {
@@ -803,7 +806,7 @@ static void parcc_move_with_constraints(parcc_context* context, const parcc_floa
         }
         x = PARCC_CLAMP(x, -map_width + vp_width, map_width - vp_width);
         if (map_height < vp_height) {
-            if (context->config.map_constraint == PARCC_CONSTRAIN_FULL) {
+            if (context->props.map_constraint == PARCC_CONSTRAIN_FULL) {
                 frame.extent = 2 * map_height * aspect;
                 vp_width = frame.extent / 2;
                 vp_height = vp_width / aspect;
@@ -828,7 +831,7 @@ static void parcc_move_with_constraints(parcc_context* context, const parcc_floa
         }
         y = PARCC_CLAMP(y, -map_height + vp_height, map_height - vp_height);
         if (map_width < vp_width) {
-            if (context->config.map_constraint == PARCC_CONSTRAIN_FULL) {
+            if (context->props.map_constraint == PARCC_CONSTRAIN_FULL) {
                 frame.extent = 2 * map_width / aspect;
                 vp_height = frame.extent / 2;
                 vp_width = vp_height * aspect;

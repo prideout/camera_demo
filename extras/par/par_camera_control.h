@@ -215,6 +215,12 @@ double parcc_get_interpolation_duration(parcc_frame a, parcc_frame b);
 #define PARCC_CLAMP(v, lo, hi) PARCC_MAX(lo, PARCC_MIN(hi, v))
 #define PARCC_CALLOC(T, N) ((T*)calloc(N * sizeof(T), 1))
 #define PARCC_FREE(BUF) free(BUF)
+#define PARCC_SWAP(T, A, B) \
+    {                       \
+        T tmp = B;          \
+        B = A;              \
+        A = tmp;            \
+    }
 
 // Implementation note about the "parcc_frame" POD. This is a simplified representation of the
 // camera state:
@@ -654,9 +660,44 @@ double parcc_get_interpolation_duration(parcc_frame a, parcc_frame b) {
     return fabs(S);
 }
 
+static bool parcc_solve_quadratic(parcc_float a, parcc_float b, parcc_float c, parcc_float* x0,
+                                  parcc_float* x1) {
+    float discr = b * b - 4 * a * c;
+    if (discr < 0) {
+        return false;
+    } else if (discr == 0) {
+        *x0 = *x1 = -0.5 * b / a;
+    } else {
+        float q = (b > 0) ? -0.5 * (b + sqrt(discr)) : -0.5 * (b - sqrt(discr));
+        *x0 = q / a;
+        *x1 = c / q;
+    }
+    if (*x0 > *x1) {
+        PARCC_SWAP(parcc_float, *x0, *x1);
+    }
+    return true;
+}
+
 static bool parcc_raycast_sphere(const parcc_float origin[3], const parcc_float dir[3],
                                  parcc_float* t, void* userdata) {
     parcc_context* context = (parcc_context*)userdata;
+    parcc_float t0, t1;
+    Vec3f L = orig - center;
+    parcc_float a = dir.dotProduct(dir);
+    parcc_float b = 2 * dir.dotProduct(L);
+    parcc_float c = L.dotProduct(L) - radius2;
+    if (!parcc_solve_quadratic(a, b, c, t0, t1)) {
+        return false;
+    }
+    if (t0 > t1) {
+        PARCC_SWAP(parcc_float, t0, t1);
+    }
+
+    if (t0 < 0) {
+        t0 = t1;
+        if (t0 < 0) return false;
+    }
+    t = t0;
     return false;
 }
 

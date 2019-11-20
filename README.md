@@ -10,14 +10,27 @@ do `make run`. For other platforms, simply invoke CMake in the way that you norm
 # Tweet
 
 I wrote a camera controller as a single-file C library. Supports smooth Van Wijk zoom & pan with
-perspective correction. Also has an orbit mode for arcball-style control. Docs and wasm demos at
+perspective correction. Also has an orbit mode for sketchfab-style control. Docs and wasm demos at
 https://github.com/prideout/camera_demo
 
 # TODO
 
-- implement ORBIT mode: get_home, get_current, goto_frame
+ORBIT
+- no sphere, just simple rotation about the center point
+    - X-axis is limited to -90,+90, Y-axis is limitless
+        - these axes live in world space
+    - dragging both buttons "strafes"; this translates the rotation center as well
+    - scrolling moves fwd / backwd along the view axes, and does not affect the rotation center
+
+- get_home, get_current, goto_frame
+    -  φ=atan2(y,x) and θ=acos(z).
+    - If you want to normalize them into the [0,1] range
+      - divide θ by π and (φ+π) by 2π
+
+# Demo ideas
 
 - change mouse cursor during pan / zoom
+    - CSS cursors: grab default, grabbing for pan, all-scroll for strafe, crosshair for zoom
 
 - two emscripten demos (no microui stuff, probably)
 
@@ -36,7 +49,7 @@ https://github.com/prideout/camera_demo
 # Longer term ideas
 
 - Multi-touch support, especially for zoom.
-- Consider adding FREE mode that changes the look-at vectors directly (forward / backward etc)
+- First person mode (sketchfab has this)
 - Demonstrate precision crosshairs for deep zoom, similar to my old blog post.
 - Make a demo that has a "view cube" as seen in tinkercad. See `ImGuizmo` for inspiration.
 

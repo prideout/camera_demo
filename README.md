@@ -13,21 +13,32 @@ I wrote a camera controller as a single-file C library. Supports smooth Van Wijk
 perspective correction. Also has an orbit mode for sketchfab-style control. Docs and wasm demos at
 https://github.com/prideout/camera_demo
 
-# TODO
+# Notes on Orbit mode
 
-- strafe
+When the controller is in orbit mode, the orientation of the camera is defined by a Y-axis
+rotation followed by an X-axis rotation.
 
-ORBIT
+φ :: X axis rotation :: constrained   :: applied first  :: how far from equator
+θ :: Y axis rotation :: unconstrained :: applied second :: how far from prime meridian
+
+If home_vector is (0,0,1) then eyepos works like this:
+
+PLEASE VERIFY WITH PYTHON THAT THE FOLLOWING IS ALL TRUE
+
+x = sin(θ) * cos(φ)
+y = sin(φ)          // the "axis" of planet is the Y axis
+z = cos(θ) * cos(φ) // because we want Z=1 when θ=φ=0
+
+θ = atan2(x,z)
+φ = asin(y)
+
+# TODO for Orbit mode
+
+- get_current, goto_frame
+
 - no sphere, just simple rotation about the center point
-    - X-axis is limited to -90,+90, Y-axis is limitless
-        - these axes live in world space
     - dragging both buttons "strafes"; this translates the rotation center as well
     - scrolling moves fwd / backwd along the view axes, and does not affect the rotation center
-
-- get_home, get_current, goto_frame
-    -  φ=atan2(y,x) and θ=acos(z).
-    - If you want to normalize them into the [0,1] range
-      - divide θ by π and (φ+π) by 2π
 
 # Demo ideas
 

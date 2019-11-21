@@ -3,8 +3,8 @@
 //
 // This simple library controls a camera that orbits or pans over a 3D object or terrain. No
 // assumptions are made about the renderer or platform. In a sense, this is just a math library.
-// Clients notify the controller of generic input events (e.g. grab_begin, grab_move, grab_end) and
-// then query for look-at vectors (position, target, up) or the 4x4 view matrix.
+// Clients notify the controller of generic input events (e.g. grab_begin, grab_move, grab_end)
+// and retrieve the look-at vectors (position, target, up) or 4x4 matrices for the camera.
 //
 // In map mode, users can control their viewing position by grabbing and dragging locations in the
 // scene. Sometimes this is known as "through-the-lens" camera control. In this mode the controller
@@ -107,6 +107,7 @@ typedef struct {
 
 // The parcc_frame structure holds captured camera state for Van Wijk animation and bookmarks.
 // From the user's perspective, this should be treated as an opaque structure.
+
 typedef struct {
     parcc_mode mode;
     union {
@@ -119,39 +120,51 @@ typedef struct {
     };
 } parcc_frame;
 
-// Context constructor and destructor.
+// CONTROLLER CONSTRUCTOR AND DESTRUCTOR
+
+// The constructor is the only function in the library that performs heap allocation. It
+// does not retain the given properties pointer, it simply copies values out of it.
+
 parcc_context* parcc_create_context(const parcc_properties* props);
 void parcc_destroy_context(parcc_context* ctx);
 
-// Property setters and getters.
+// PROPERTY SETTERS AND GETTERS
+
+// The client owns its own instance of the property struct and these functions simply copy values in
+// or out of the given struct. Changing some properties might cause a small amount of work to be
+// performed.
+
 void parcc_set_properties(parcc_context* context, const parcc_properties* props);
 void parcc_get_properties(const parcc_context* context, parcc_properties* out);
 
-// Camera retrieval functions.
-void parcc_get_look_at(const parcc_context* ctx,  //
-                       parcc_float eyepos[3],     //
-                       parcc_float target[3],     //
+// CAMERA RETRIEVAL FUNCTIONS
+
+void parcc_get_look_at(const parcc_context* ctx, parcc_float eyepos[3], parcc_float target[3],
                        parcc_float upward[3]);
+void parcc_get_matrices(const parcc_context* ctx, parcc_float projection[16], parcc_float view[16]);
 
-void parcc_get_matrices(const parcc_context* ctx,    //
-                        parcc_float projection[16],  //
-                        parcc_float view[16]);
+// SCREEN-SPACE FUNCTIONS FOR USER INTERACTION
 
-// Screen-space functions for user interaction.
-//
 // Each of these functions take winx / winy coords.
 // - The winx coord should be in [0, viewport_width) where 0 is the left-most column.
 // - The winy coord should be in [0, viewport_height) where 0 is the top-most row.
 //
-// The scrolldelta argument is used for zooming; positive indicates "zoom in". This gets scaled by
-// zoom_speed. Zoom speed is also scaled by distance-to-ground. To prevent zooming in too far, use a
-// non-zero value for map_min_distance.
-void parcc_grab_begin(parcc_context* context, int winx, int winy);
-void parcc_grab_update(parcc_context* context, int winx, int winy, parcc_float scrolldelta);
-void parcc_grab_end(parcc_context* context);
-bool parcc_do_raycast(parcc_context* context, int winx, int winy, parcc_float result[3]);
+// The scrolldelta argument is used for zooming. Positive values indicate "zoom in" in MAP mode or
+// "move forward" in ORBIT mode. This gets scaled by zoom_speed. In MAP mode, the zoom speed is also
+// scaled by distance-to-ground. To prevent zooming in too far, use a non-zero value for
+// map_min_distance.
+//
+// The strafe argument exists only for ORBIT mode and is typically associated with the right
+// mouse button or two-finger dragging. This is used to pan the view.
 
-// Frames (simplified camera states for bookmarking) and Van Wijk interpolation functions.
+void parcc_grab_begin(parcc_context* context, int winx, int winy, bool strafe);
+void parcc_grab_update(parcc_context* context, int winx, int winy);
+void parcc_grab_end(parcc_context* context);
+void parcc_zoom(parcc_context* context, int winx, int winy, parcc_float scrolldelta);
+bool parcc_raycast(parcc_context* context, int winx, int winy, parcc_float result[3]);
+
+// BOOKMARKING AND VAN WIJK INTERPOLATION FUNCTIONS
+
 parcc_frame parcc_get_current_frame(const parcc_context* context);
 parcc_frame parcc_get_home_frame(const parcc_context* context);
 void parcc_goto_frame(parcc_context* context, parcc_frame state);
@@ -197,8 +210,8 @@ double parcc_get_interpolation_duration(parcc_frame a, parcc_frame b);
 // - the pan offset is stored as a 2D vector from home_target that gets projected to map_plane.
 //
 // ORBIT mode:
-// - radians[0] = theta = Y-axis rotation in [-pi, +pi]
-// - radians[1] = phi   = X-axis rotation in [-pi/2, +pi/2]
+// - radians[0] = phi   = X-axis rotation in [-pi/2, +pi/2] (applies first)
+// - radians[1] = theta = Y-axis rotation in [-pi, +pi]     (applies second)
 // - rotation_center is initialized to home_center but might be changed via panning
 // - distance is the distance between the eye position and the rotation_center
 
@@ -305,8 +318,8 @@ void parcc_get_look_at(const parcc_context* ctx, parcc_float eyepos[3], parcc_fl
     }
 }
 
-void parcc_grab_begin(parcc_context* context, int winx, int winy) {
-    if (!parcc_do_raycast(context, winx, winy, context->grab_point_world)) {
+void parcc_grab_begin(parcc_context* context, int winx, int winy, bool strafe) {
+    if (!parcc_raycast(context, winx, winy, context->grab_point_world)) {
         return;
     }
     context->grabbing = true;
@@ -315,8 +328,7 @@ void parcc_grab_begin(parcc_context* context, int winx, int winy) {
     float3_copy(context->grab_point_target, context->target);
 }
 
-void parcc_grab_update(parcc_context* context, int winx, int winy, parcc_float scrolldelta) {
-    // Handle pan.
+void parcc_grab_update(parcc_context* context, int winx, int winy) {
     if (context->grabbing) {
         parcc_float u_vec[3];
         float3_subtract(u_vec, context->grab_point_world, context->grab_point_eyepos);
@@ -341,11 +353,12 @@ void parcc_grab_update(parcc_context* context, int winx, int winy, parcc_float s
 
         parcc_move_with_constraints(context, eyepos, target);
     }
+}
 
-    // Handle zoom.
+void parcc_zoom(parcc_context* context, int winx, int winy, parcc_float scrolldelta) {
     if (scrolldelta != 0.0) {
         parcc_float grab_point_world[3];
-        if (!parcc_do_raycast(context, winx, winy, grab_point_world)) {
+        if (!parcc_raycast(context, winx, winy, grab_point_world)) {
             return;
         }
 
@@ -382,7 +395,7 @@ void parcc_grab_update(parcc_context* context, int winx, int winy, parcc_float s
 
 void parcc_grab_end(parcc_context* context) { context->grabbing = false; }
 
-bool parcc_do_raycast(parcc_context* context, int winx, int winy, parcc_float result[3]) {
+bool parcc_raycast(parcc_context* context, int winx, int winy, parcc_float result[3]) {
     const parcc_float width = context->props.viewport_width;
     const parcc_float height = context->props.viewport_height;
     const parcc_float fov = context->props.fov_degrees * VEC_PI / 180.0;
@@ -520,7 +533,12 @@ parcc_frame parcc_get_home_frame(const parcc_context* context) {
     }
 
     if (context->props.mode == PARCC_ORBIT) {
-        // TODO
+        frame.radians[0] = 0;
+        frame.radians[1] = 0;
+        frame.rotation_center[0] = context->home_target[0];
+        frame.rotation_center[1] = context->home_target[1];
+        frame.rotation_center[2] = context->home_target[2];
+        frame.distance = float3_length(context->home_vector);
     }
 
     return frame;

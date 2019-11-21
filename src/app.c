@@ -204,11 +204,15 @@ void app_init(App* app) {
         .far_plane = kFarPlane,
         .fov_orientation = PARCC_HORIZONTAL,
         .home_target = {center[0], center[1], 0},
+
+        // MAP MODE PROPERTIES:
         .map_extent = {extent[0], extent[1]},
         .map_min_distance = app->max_corner[2],
         .raycast_function = app_intersects_mesh,
         .raycast_userdata = (void*)app,
-        .home_vector = {0, 0, 100.0},
+
+        // ORBIT MODE PROPERTIES:
+        .home_vector = {0, 0, 1.75},
     };
     app->camera_controller = parcc_create_context(&props);
 

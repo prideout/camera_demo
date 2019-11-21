@@ -29,7 +29,7 @@ static void handler(const sapp_event* event) {
         case SAPP_EVENTTYPE_MOUSE_DOWN: {
             mouse_down_pos[0] = winx;
             mouse_down_pos[1] = winy;
-            parcc_grab_begin(app.camera_controller, winx, winy);
+            parcc_grab_begin(app.camera_controller, winx, winy, event->mouse_button);
             break;
         }
         case SAPP_EVENTTYPE_MOUSE_UP:
@@ -37,7 +37,7 @@ static void handler(const sapp_event* event) {
             if (winx == mouse_down_pos[0] && winy == mouse_down_pos[1]) {
                 printf("Clicked [%d, %d]", winx, winy);
                 float world_space[3];
-                if (parcc_do_raycast(app.camera_controller, winx, winy, world_space)) {
+                if (parcc_raycast(app.camera_controller, winx, winy, world_space)) {
                     printf(" intersection at ");
                     float3_print(stdout, world_space);
                 }
@@ -45,10 +45,10 @@ static void handler(const sapp_event* event) {
             }
             break;
         case SAPP_EVENTTYPE_MOUSE_SCROLL:
-            parcc_grab_update(app.camera_controller, winx, winy, event->scroll_y);
+            parcc_zoom(app.camera_controller, winx, winy, event->scroll_y);
             break;
         case SAPP_EVENTTYPE_MOUSE_MOVE:
-            parcc_grab_update(app.camera_controller, winx, winy, 0);
+            parcc_grab_update(app.camera_controller, winx, winy);
             break;
         case SAPP_EVENTTYPE_MOUSE_ENTER:
         case SAPP_EVENTTYPE_MOUSE_LEAVE:

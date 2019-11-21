@@ -202,13 +202,13 @@ void app_init(App* app) {
         .viewport_height = sapp_height(),
         .near_plane = kNearPlane,
         .far_plane = kFarPlane,
+        .fov_orientation = PARCC_HORIZONTAL,
+        .home_target = {center[0], center[1], 0},
         .map_extent = {extent[0], extent[1]},
         .map_min_distance = app->max_corner[2],
-        .fov_orientation = PARCC_HORIZONTAL,
         .raycast_function = app_intersects_mesh,
         .raycast_userdata = (void*)app,
-        .home_target = {center[0], center[1], 0},
-        .orbit_radius = fmax(extent[0], extent[1]) / 2.0,
+        .home_vector = {0, 0, 100.0},
     };
     app->camera_controller = parcc_create_context(&props);
 

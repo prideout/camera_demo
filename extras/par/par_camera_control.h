@@ -1,54 +1,23 @@
 // CAMERA CONTROL :: https://prideout.net/blog/par_camera_control/
 // Enables orbit controls (a.k.a. tumble, arcball, trackball) or pan-and-zoom like Google Maps.
 //
-// This simple library controls a camera that orbits or pans over a 3D object or terrain. Users can
-// control their viewing position by grabbing and dragging locations in the scene. Sometimes this is
-// known as "through-the-lens" camera control. No assumptions are made about the renderer or
-// platform. In a sense, this is just a math library.
+// This simple library controls a camera that orbits or pans over a 3D object or terrain. No
+// assumptions are made about the renderer or platform. In a sense, this is just a math library.
+// Clients notify the controller of generic input events (e.g. grab_begin, grab_move, grab_end) and
+// then query for look-at vectors (position, target, up) or the 4x4 view matrix.
 //
-// When the controller is in ORBIT mode, it allows users to move the camera longitudinally or
-// latitudinally, but does not allow for tilting the "up" vector. The rationale is that people
-// rarely crook their heads sideways when examining 3D objects. Quaternions are great, but they are
-// avoided here! Instead the orientation of the camera is defined by a Y-axis rotation followed by
-// an X-axis rotation.
+// In map mode, users can control their viewing position by grabbing and dragging locations in the
+// scene. Sometimes this is known as "through-the-lens" camera control. In this mode the controller
+// takes an optional raycast callback to support precise grabbing behavior. If this is not required
+// for your use case (e.g. a top-down terrain with an orthgraphic projection), provide NULL for the
+// callback and the library will simply raycast against the ground plane.
 //
-// The library takes a raycast callback to support precise grabbing behavior. If this is not
-// required for your use case (e.g. a top-down terrain with an orthgraphic projection), provide NULL
-// for the callback and the library will simply raycast against the ground plane.
+// When the controller is in orbit mode, the orientation of the camera is defined by a Y-axis
+// rotation followed by an X-axis rotation. Additionally, the camera can fly forward or backward
+// along the viewing direction.
 //
-// The following is an abbreviated usage example, for a more complete example see:
+// For usage examples, web demos, and additional documentation go to:
 // https://github.com/prideout/camera_demo
-//
-//     #define PAR_CAMERA_CONTROL_IMPLEMENTATION
-//     #include "par_camera_control.h"
-//
-//     static bool raycast(float origin[3], float dir[3], float* t, void* my_mesh) {
-//        ...
-//     }
-//
-//     parcc_context* controller = parc_create_context(&(parcc_properties) {
-//         .mode = PARCC_MAP,
-//         .viewport_width = 1024,
-//         .viewport_height = 768,
-//         .near_plane = 0.01,
-//         .far_plane = 100.0,
-//         .map_plane = {0, 0, 1, 0},      // the map lies a Z=0
-//         .map_extent = {2000.0, 1000.0}, // width = 2000, height = 1000
-//         .raycast_function = raycast,    // or use NULL to intersect plane
-//         .raycast_userdata = my_mesh,
-//     });
-//
-//    while (game_loop) {
-//
-//        parcc_float eyepos[3], target[3], upward[3];
-//        parcc_get_look_at(controller, eyepos, target, upward);
-//        // ^ or use "parcc_get_matrices" to compute 4x4 matrices
-//
-//        my_camera->set_look_at(eyepos, target, upward);
-//        ...
-//     }
-//
-//     parcc_destroy_context(controller);
 //
 // Distributed under the MIT License, see bottom of file.
 
@@ -67,6 +36,9 @@ typedef double parcc_float;
 typedef float parcc_float;
 #endif
 
+// Opaque handle to a camera controller.
+typedef struct parcc_context_s parcc_context;
+
 // The camera controller can be configured using either a VERTICAL or HORIZONTAL field of view.
 // This specifies which of the two FOV angles should be held constant. For example, if you use a
 // horizontal FOV, shrinking the viewport width will change the height of the frustum, but will
@@ -84,7 +56,7 @@ typedef enum {
 
 // Pan and zoom constraints for MAP mode.
 typedef enum {
-    // No constraints except that map_min_distance is still enforced.
+    // No constraints except that map_min_distance is enforced.
     PARCC_CONSTRAIN_NONE,
 
     // Constrains pan and zoom to limit the viewport's extent along the FOV axis so that it always
@@ -98,61 +70,54 @@ typedef enum {
     PARCC_CONSTRAIN_FULL,
 } parcc_constraint;
 
-// Captured camera state used for Van Wijk animation and bookmarks.
-// From the user's perspective, this should be treated as an opaque structure.
-typedef struct {
-    parcc_mode mode;
-    parcc_float extent;
-    union {
-        parcc_float center[2];
-        struct {
-            parcc_float theta;
-            parcc_float phi;  // this is typically constrained to [-pi/2, +pi/2]
-        };
-    };
-} parcc_frame;
-
-typedef struct {
-    parcc_float min_value;
-    parcc_float max_value;
-} parcc_range;
-
 // Optional user-provided ray casting function to enable precise panning behavior.
 typedef bool (*parcc_raycast_fn)(const parcc_float origin[3], const parcc_float dir[3],
                                  parcc_float* t, void* userdata);
 
-// The properties structure represents all user-controlled state in the library.
-// The first few fields must be provided, but all remaining fields fall back to reasonable default
-// values when they are zero-filled.
+// The parcc_properties structure holds all user-controlled state in the library.
+// Many fields are swapped with fallback values values if they are zero-filled.
+
 typedef struct {
+    // REQUIRED PROPERTIES
     parcc_mode mode;         // must be PARCC_ORBIT or PARCC_MAP
     int viewport_width;      // horizontal extent in pixels
     int viewport_height;     // vertical extent in pixels
     parcc_float near_plane;  // distance between camera and near clipping plane
     parcc_float far_plane;   // distance between camera and far clipping plane
 
-    parcc_float map_extent[2];        // size constraint for map_plane (centered at home_target)
-    parcc_float map_plane[4];         // plane equation with normalized XYZ, defaults to (0,0,1,0)
-    parcc_constraint map_constraint;  // defaults to PARCC_CONSTRAIN_NONE
-    parcc_float map_min_distance;     // constrains zoom using distance between camera and plane
-
-    parcc_fov fov_orientation;  // defaults to PARCC_VERTICAL
-    parcc_float fov_degrees;    // full field-of-view angle (not half-angle), defaults to 33.
-    parcc_float zoom_speed;     // defaults to 0.01
-
-    parcc_raycast_fn raycast_function;  // defaults to plane & sphere intersectors
-    void* raycast_userdata;             // arbitrary data for the raycast callback
-
+    // PROPERTIES WITH DEFAULT VALUES
+    parcc_fov fov_orientation;   // defaults to PARCC_VERTICAL
+    parcc_float fov_degrees;     // full field-of-view angle (not half-angle), defaults to 33.
+    parcc_float zoom_speed;      // defaults to 0.01
     parcc_float home_target[3];  // world-space coordinate, defaults to (0,0,0)
     parcc_float home_upward[3];  // unit-length vector, defaults to (0,1,0)
 
-    parcc_float orbit_radius;  // radius of grabbable sphere centered at home_target
-    parcc_range orbit_constraint_theta_degrees;  // Y axis rotation, defaults to [-inf,+inf]
-    parcc_range orbit_constraint_phi_degrees;    // X axis rotation, defaults to [-89, +89]
+    // MAP-MODE PROPERTIES
+    parcc_float map_extent[2];          // (required) size of quad centered at home_target
+    parcc_float map_plane[4];           // plane equation with normalized XYZ, defaults to (0,0,1,0)
+    parcc_constraint map_constraint;    // defaults to PARCC_CONSTRAIN_NONE
+    parcc_float map_min_distance;       // constrains zoom using distance between camera and plane
+    parcc_raycast_fn raycast_function;  // defaults to a simple plane intersector
+    void* raycast_userdata;             // arbitrary data for the raycast callback
+
+    // ORBIT-MODE PROPERTIES
+    parcc_float home_vector[3];  // (required) vector from home_target to initial eye position
+
 } parcc_properties;
 
-// Opaque handle to a camera controller.
-typedef struct parcc_context_s parcc_context;
+// The parcc_frame structure holds captured camera state for Van Wijk animation and bookmarks.
+// From the user's perspective, this should be treated as an opaque structure.
+typedef struct {
+    parcc_mode mode;
+    union {
+        struct {
+            parcc_float extent, center[2];
+        };
+        struct {
+            parcc_float radians[2], rotation_center[3], distance;
+        };
+    };
+} parcc_frame;
 
 // Context constructor and destructor.
 parcc_context* parcc_create_context(const parcc_properties* props);
@@ -222,16 +187,20 @@ double parcc_get_interpolation_duration(parcc_frame a, parcc_frame b);
         A = tmp;            \
     }
 
-// Implementation note about the "parcc_frame" POD. This is a simplified representation of the
-// camera state:
+// Implementation note about the "parcc_frame" POD. This is an abbreviated camera state
+// used for animation and bookmarking.
 //
+// MAP mode:
 // - zoom level is represented with the extent of the rectangle formed by the intersection of the
 //   frustum with the viewing plane at home_target. It is either a width or a height, depending on
 //   fov_orientation.
+// - the pan offset is stored as a 2D vector from home_target that gets projected to map_plane.
 //
-// - In MAP mode, pan is stored as a 2D vector from home_target that gets projected to map_plane.
-//
-// - In ORBIT mode, pan is represented with lat-long angles in radians.
+// ORBIT mode:
+// - radians[0] = theta = Y-axis rotation in [-pi, +pi]
+// - radians[1] = phi   = X-axis rotation in [-pi/2, +pi/2]
+// - rotation_center is initialized to home_center but might be changed via panning
+// - distance is the distance between the eye position and the rotation_center
 
 struct parcc_context_s {
     parcc_properties props;
@@ -276,16 +245,6 @@ void parcc_set_properties(parcc_context* context, const parcc_properties* pprops
     }
     if (float4_dot(props.map_plane, props.map_plane) == 0) {
         props.map_plane[2] = 1;
-    }
-
-    parcc_range* theta = &props.orbit_constraint_theta_degrees;
-    if (theta->min_value == 0 && theta->max_value == 0) {
-        *theta = (parcc_range){-INFINITY, INFINITY};
-    }
-
-    parcc_range* phi = &props.orbit_constraint_phi_degrees;
-    if (phi->min_value == 0 && phi->max_value == 0) {
-        *phi = (parcc_range){-89, +89};
     }
 
     const bool more_constrained = (int)props.map_constraint > (int)context->props.map_constraint;
@@ -561,19 +520,7 @@ parcc_frame parcc_get_home_frame(const parcc_context* context) {
     }
 
     if (context->props.mode == PARCC_ORBIT) {
-        const parcc_float orbit_radius = context->props.orbit_radius;
-        const bool horiz = context->props.fov_orientation == PARCC_HORIZONTAL;
-        frame.theta = 0;
-        frame.theta = 0;
-        if (horiz) {
-            parcc_float vp_width = frame.extent / 2;
-            parcc_float vp_height = vp_width / aspect;
-            frame.extent = 2 * orbit_radius * aspect;
-        } else {
-            parcc_float vp_height = frame.extent / 2;
-            parcc_float vp_width = vp_height * aspect;
-            frame.extent = 2 * orbit_radius / aspect;
-        }
+        // TODO
     }
 
     return frame;

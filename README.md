@@ -15,6 +15,8 @@ https://github.com/prideout/camera_demo
 
 # TODO
 
+- strafe
+
 ORBIT
 - no sphere, just simple rotation about the center point
     - X-axis is limited to -90,+90, Y-axis is limitless

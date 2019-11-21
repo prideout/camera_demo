@@ -13,32 +13,15 @@ I wrote a camera controller as a single-file C library. Supports smooth Van Wijk
 perspective correction. Also has an orbit mode for sketchfab-style control. Docs and wasm demos at
 https://github.com/prideout/camera_demo
 
-# Notes on Orbit mode
-
-When the controller is in orbit mode, the orientation of the camera is defined by a Y-axis
-rotation followed by an X-axis rotation.
-
-φ :: X axis rotation :: constrained   :: applied first  :: how far from equator
-θ :: Y axis rotation :: unconstrained :: applied second :: how far from prime meridian
-
-If home_vector is (0,0,1) then eyepos works like this:
-
-PLEASE VERIFY WITH PYTHON THAT THE FOLLOWING IS ALL TRUE
-
-x = sin(θ) * cos(φ)
-y = sin(φ)          // the "axis" of planet is the Y axis
-z = cos(θ) * cos(φ) // because we want Z=1 when θ=φ=0
-
-θ = atan2(x,z)
-φ = asin(y)
-
 # TODO for Orbit mode
 
-- get_current, goto_frame
+- scrolling moves fwd / backwd along the view axes, and does not affect the rotation center
 
-- no sphere, just simple rotation about the center point
-    - dragging both buttons "strafes"; this translates the rotation center as well
-    - scrolling moves fwd / backwd along the view axes, and does not affect the rotation center
+- dragging both buttons "strafes"; this translates the rotation center as well
+
+- interpolate_frame for orbit mode
+
+- refactor magic numbers 100.0 into property: orbit_speed[2]
 
 # Demo ideas
 
@@ -61,6 +44,7 @@ z = cos(θ) * cos(φ) // because we want Z=1 when θ=φ=0
 
 # Longer term ideas
 
+- Momentum for panning (this might be implemented in the demo rather than the library)
 - Multi-touch support, especially for zoom.
 - First person mode (sketchfab has this)
 - Demonstrate precision crosshairs for deep zoom, similar to my old blog post.

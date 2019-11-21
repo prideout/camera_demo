@@ -197,7 +197,7 @@ void app_init(App* app) {
     app->gfx.uniforms.map_center[1] = center[1];
 
     const parcc_properties props = {
-        .mode = PARCC_MAP,
+        .mode = PARCC_ORBIT,
         .viewport_width = sapp_width() - kSidebarWidth,
         .viewport_height = sapp_height(),
         .near_plane = kNearPlane,
@@ -342,6 +342,12 @@ void app_draw(App* app) {
 }
 
 void app_goto_frame(App* app, parcc_frame goal) {
+    parcc_properties props;
+    parcc_get_properties(app->camera_controller, &props);
+    if (props.mode == PARCC_ORBIT) {
+        parcc_goto_frame(app->camera_controller, goal);
+        return;
+    }
     if (app->transition.enabled) {
         return;
     }

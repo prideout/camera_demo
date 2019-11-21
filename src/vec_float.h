@@ -46,7 +46,7 @@ inline void float3_scale(float dst[3], float v) {
     dst[2] *= v;
 }
 
-inline float float3_length(float dst[3]) { return sqrtf(float3_dot(dst, dst)); }
+inline float float3_length(const float dst[3]) { return sqrtf(float3_dot(dst, dst)); }
 
 inline void float3_normalize(float dst[3]) { float3_scale(dst, 1.0f / float3_length(dst)); }
 

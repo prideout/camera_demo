@@ -46,7 +46,7 @@ inline void double3_scale(double dst[3], double v) {
     dst[2] *= v;
 }
 
-inline double double3_length(double dst[3]) { return sqrtf(double3_dot(dst, dst)); }
+inline double double3_length(const double dst[3]) { return sqrtf(double3_dot(dst, dst)); }
 
 inline void double3_normalize(double dst[3]) { double3_scale(dst, 1.0f / double3_length(dst)); }
 

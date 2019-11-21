@@ -215,15 +215,20 @@ double parcc_get_interpolation_duration(parcc_frame a, parcc_frame b);
 // - rotation_center is initialized to home_center but might be changed via panning
 // - distance is the distance between the eye position and the rotation_center
 
+typedef enum { PARCC_GRAB_NONE, PARCC_GRAB, PARCC_GRAB_STRAFE } GrabState;
+
 struct parcc_context_s {
     parcc_properties props;
     parcc_float eyepos[3];
     parcc_float target[3];
-    bool grabbing;
+    GrabState grabbing;
     parcc_float grab_point_far[3];
     parcc_float grab_point_world[3];
     parcc_float grab_point_eyepos[3];
     parcc_float grab_point_target[3];
+    parcc_frame grab_frame;
+    int grab_winx;
+    int grab_winy;
 };
 
 static bool parcc_raycast_plane(const parcc_float origin[3], const parcc_float dir[3],
@@ -319,17 +324,26 @@ void parcc_get_look_at(const parcc_context* ctx, parcc_float eyepos[3], parcc_fl
 }
 
 void parcc_grab_begin(parcc_context* context, int winx, int winy, bool strafe) {
-    if (!parcc_raycast(context, winx, winy, context->grab_point_world)) {
-        return;
+    context->grabbing = strafe ? PARCC_GRAB_STRAFE : PARCC_GRAB;
+
+    if (context->props.mode == PARCC_MAP) {
+        if (!parcc_raycast(context, winx, winy, context->grab_point_world)) {
+            return;
+        }
+        parcc_get_ray_far(context, winx, winy, context->grab_point_far);
+        float3_copy(context->grab_point_eyepos, context->eyepos);
+        float3_copy(context->grab_point_target, context->target);
     }
-    context->grabbing = true;
-    parcc_get_ray_far(context, winx, winy, context->grab_point_far);
-    float3_copy(context->grab_point_eyepos, context->eyepos);
-    float3_copy(context->grab_point_target, context->target);
+
+    if (context->props.mode == PARCC_ORBIT) {
+        context->grab_frame = parcc_get_current_frame(context);
+        context->grab_winx = winx;
+        context->grab_winy = winy;
+    }
 }
 
 void parcc_grab_update(parcc_context* context, int winx, int winy) {
-    if (context->grabbing) {
+    if (context->props.mode == PARCC_MAP && context->grabbing) {
         parcc_float u_vec[3];
         float3_subtract(u_vec, context->grab_point_world, context->grab_point_eyepos);
         const parcc_float u_len = float3_length(u_vec);
@@ -353,10 +367,29 @@ void parcc_grab_update(parcc_context* context, int winx, int winy) {
 
         parcc_move_with_constraints(context, eyepos, target);
     }
+
+    if (context->props.mode == PARCC_ORBIT && context->grabbing == PARCC_GRAB) {
+        parcc_frame frame = parcc_get_current_frame(context);
+
+        const int delx = context->grab_winx - winx;
+        const int dely = context->grab_winy - winy;
+
+        const parcc_float phi = dely / 100.0f;    // ??
+        const parcc_float theta = delx / 100.0f;  // ??
+
+        frame.radians[0] = context->grab_frame.radians[0] + phi;
+        frame.radians[1] = context->grab_frame.radians[1] + theta;
+
+        parcc_goto_frame(context, frame);
+    }
+
+    if (context->props.mode == PARCC_ORBIT && context->grabbing == PARCC_GRAB_STRAFE) {
+        // TODO: strafe
+    }
 }
 
 void parcc_zoom(parcc_context* context, int winx, int winy, parcc_float scrolldelta) {
-    if (scrolldelta != 0.0) {
+    if (context->props.mode == PARCC_MAP) {
         parcc_float grab_point_world[3];
         if (!parcc_raycast(context, winx, winy, grab_point_world)) {
             return;
@@ -391,9 +424,13 @@ void parcc_zoom(parcc_context* context, int winx, int winy, parcc_float scrollde
 
         parcc_move_with_constraints(context, eyepos, target);
     }
+
+    if (context->props.mode == PARCC_ORBIT) {
+        // TODO
+    }
 }
 
-void parcc_grab_end(parcc_context* context) { context->grabbing = false; }
+void parcc_grab_end(parcc_context* context) { context->grabbing = PARCC_GRAB_NONE; }
 
 bool parcc_raycast(parcc_context* context, int winx, int winy, parcc_float result[3]) {
     const parcc_float width = context->props.viewport_width;
@@ -460,8 +497,8 @@ bool parcc_raycast(parcc_context* context, int winx, int winy, parcc_float resul
 }
 
 parcc_frame parcc_get_current_frame(const parcc_context* context) {
-    parcc_frame result = {0};
-    result.mode = context->props.mode;
+    parcc_frame frame = {0};
+    frame.mode = context->props.mode;
 
     if (context->props.mode == PARCC_MAP) {
         const parcc_float* origin = context->eyepos;
@@ -492,11 +529,27 @@ parcc_frame parcc_get_current_frame(const parcc_context* context) {
 
         float3_subtract(target, target, context->props.home_target);
 
-        result.extent = half_extent * 2;
-        result.center[0] = float3_dot(uvec, target);
-        result.center[1] = float3_dot(vvec, target);
+        frame.extent = half_extent * 2;
+        frame.center[0] = float3_dot(uvec, target);
+        frame.center[1] = float3_dot(vvec, target);
     }
-    return result;
+
+    if (context->props.mode == PARCC_ORBIT) {
+        parcc_float center_to_eye[3];
+        float3_subtract(center_to_eye, context->eyepos, context->target);
+        frame.distance = float3_length(center_to_eye);
+
+        const parcc_float x = center_to_eye[0] / frame.distance;
+        const parcc_float y = center_to_eye[1] / frame.distance;
+        const parcc_float z = center_to_eye[2] / frame.distance;
+
+        frame.radians[0] = asin(y);      // phi
+        frame.radians[1] = atan2(x, z);  // theta
+
+        float3_copy(frame.rotation_center, context->target);
+    }
+
+    return frame;
 }
 
 parcc_frame parcc_get_home_frame(const parcc_context* context) {
@@ -507,7 +560,7 @@ parcc_frame parcc_get_home_frame(const parcc_context* context) {
     parcc_frame frame;
     frame.mode = context->props.mode;
 
-    if (context->props.mode == PARCC_MAP) {
+    if (frame.mode == PARCC_MAP) {
         const parcc_float map_width = context->props.map_extent[0] / 2;
         const parcc_float map_height = context->props.map_extent[1] / 2;
         const bool horiz = context->props.fov_orientation == PARCC_HORIZONTAL;
@@ -532,13 +585,11 @@ parcc_frame parcc_get_home_frame(const parcc_context* context) {
         }
     }
 
-    if (context->props.mode == PARCC_ORBIT) {
+    if (frame.mode == PARCC_ORBIT) {
         frame.radians[0] = 0;
         frame.radians[1] = 0;
-        frame.rotation_center[0] = context->home_target[0];
-        frame.rotation_center[1] = context->home_target[1];
-        frame.rotation_center[2] = context->home_target[2];
-        frame.distance = float3_length(context->home_vector);
+        float3_copy(frame.rotation_center, context->props.home_target);
+        frame.distance = float3_length(context->props.home_vector);
     }
 
     return frame;
@@ -574,6 +625,17 @@ void parcc_goto_frame(parcc_context* context, parcc_frame frame) {
         float3_scale(target_to_eye, distance);
         float3_add(context->eyepos, context->target, target_to_eye);
     }
+
+    if (context->props.mode == PARCC_ORBIT) {
+        float3_copy(context->target, frame.rotation_center);
+        const parcc_float phi = frame.radians[0];
+        const parcc_float theta = frame.radians[1];
+        const parcc_float x = frame.distance * sin(theta) * cos(phi);
+        const parcc_float y = frame.distance * sin(phi);
+        const parcc_float z = frame.distance * cos(theta) * cos(phi);
+        float3_set(context->eyepos, x, y, z);
+        float3_add(context->eyepos, context->target, context->eyepos);
+    }
 }
 
 parcc_frame parcc_interpolate_frames(parcc_frame a, parcc_frame b, double t) {
@@ -589,20 +651,20 @@ parcc_frame parcc_interpolate_frames(parcc_frame a, parcc_frame b, double t) {
     const double dr = r1 - r0;
     const int valid_dr = (dr == dr) && dr != 0;
     const double S = (valid_dr ? dr : log(w1 / w0)) / rho;
-    parcc_frame result;
+    parcc_frame frame;
     const double s = t * S;
     if (valid_dr) {
         const double coshr0 = cosh(r0);
         const double u = w0 / (rho2 * d1) * (coshr0 * tanh(rho * s + r0) - sinh(r0));
-        result.center[0] = ux0 + u * dx;
-        result.center[1] = uy0 + u * dy;
-        result.extent = w0 * coshr0 / cosh(rho * s + r0);
-        return result;
+        frame.center[0] = ux0 + u * dx;
+        frame.center[1] = uy0 + u * dy;
+        frame.extent = w0 * coshr0 / cosh(rho * s + r0);
+        return frame;
     }
-    result.center[0] = ux0 + t * dx;
-    result.center[1] = uy0 + t * dy;
-    result.extent = w0 * exp(rho * s);
-    return result;
+    frame.center[0] = ux0 + t * dx;
+    frame.center[1] = uy0 + t * dy;
+    frame.extent = w0 * exp(rho * s);
+    return frame;
 }
 
 double parcc_get_interpolation_duration(parcc_frame a, parcc_frame b) {

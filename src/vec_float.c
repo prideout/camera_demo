@@ -7,7 +7,7 @@ extern inline void float3_subtract(float dst[3], const float a[3], const float b
 extern inline float float3_dot(const float a[3], const float b[3]);
 extern inline void float3_cross(float dst[3], const float a[3], const float b[3]);
 extern inline void float3_scale(float dst[3], float v);
-extern inline float float3_length(float dst[3]);
+extern inline float float3_length(const float dst[3]);
 extern inline void float3_normalize(float dst[3]);
 extern inline void float3_copy(float dst[3], const float src[3]);
 extern inline void float3_copy_to_vec4(float dst[4], const float src[3], float w);

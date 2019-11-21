@@ -7,7 +7,7 @@ extern inline void double3_subtract(double dst[3], const double a[3], const doub
 extern inline double double3_dot(const double a[3], const double b[3]);
 extern inline void double3_cross(double dst[3], const double a[3], const double b[3]);
 extern inline void double3_scale(double dst[3], double v);
-extern inline double double3_length(double dst[3]);
+extern inline double double3_length(const double dst[3]);
 extern inline void double3_normalize(double dst[3]);
 extern inline void double3_copy(double dst[3], const double src[3]);
 extern inline void double3_copy_to_vec4(double dst[4], const double src[3], double w);

@@ -101,25 +101,24 @@ typedef struct {
     void* raycast_userdata;             // arbitrary data for the raycast callback
 
     // ORBIT-MODE PROPERTIES
-    parcc_float home_vector[3];  // (required) vector from home_target to initial eye position
-    parcc_float orbit_speed[2];  // rotational speed (defaults to 0.01)
+    parcc_float home_vector[3];    // (required) vector from home_target to initial eye position
+    parcc_float orbit_speed[2];    // rotational speed (defaults to 0.01)
+    parcc_float orbit_zoom_speed;  // zoom speed (defaults to 0.01)
 
 } parcc_properties;
 
 // The parcc_frame structure holds captured camera state for Van Wijk animation and bookmarks.
 // From the user's perspective, this should be treated as an opaque structure.
 
+// clang-format off
 typedef struct {
     parcc_mode mode;
     union {
-        struct {
-            parcc_float extent, center[2];
-        };
-        struct {
-            parcc_float radians[2], rotation_center[3], distance;
-        };
+        struct { parcc_float extent, center[2]; };
+        struct { parcc_float radians[2], rotation_center[3], distance; };
     };
 } parcc_frame;
+// clang-format on
 
 // CONTROLLER CONSTRUCTOR AND DESTRUCTOR
 
@@ -230,6 +229,7 @@ struct parcc_context_s {
     parcc_frame grab_frame;
     int grab_winx;
     int grab_winy;
+    parcc_float orbit_pivot[3];
 };
 
 static bool parcc_raycast_plane(const parcc_float origin[3], const parcc_float dir[3],
@@ -270,6 +270,9 @@ void parcc_set_properties(parcc_context* context, const parcc_properties* pprops
     }
     if (props.orbit_speed[1] == 0) {
         props.orbit_speed[1] = 0.01;
+    }
+    if (props.orbit_zoom_speed == 0) {
+        props.orbit_zoom_speed = 0.01;
     }
 
     const bool more_constrained = (int)props.map_constraint > (int)context->props.map_constraint;
@@ -436,7 +439,12 @@ void parcc_zoom(parcc_context* context, int winx, int winy, parcc_float scrollde
     }
 
     if (context->props.mode == PARCC_ORBIT) {
-        // TODO
+        parcc_float gaze[3];
+        float3_subtract(gaze, context->target, context->eyepos);
+        float3_normalize(gaze);
+        float3_scale(gaze, context->props.orbit_zoom_speed * scrolldelta);
+        float3_add(context->eyepos, context->eyepos, gaze);
+        float3_add(context->target, context->target, gaze);
     }
 }
 
@@ -556,7 +564,7 @@ parcc_frame parcc_get_current_frame(const parcc_context* context) {
         frame.radians[0] = asin(y);      // phi
         frame.radians[1] = atan2(x, z);  // theta
 
-        float3_copy(frame.rotation_center, context->target);
+        float3_copy(frame.rotation_center, context->orbit_pivot);
     }
 
     return frame;
@@ -638,13 +646,14 @@ void parcc_goto_frame(parcc_context* context, parcc_frame frame) {
 
     if (context->props.mode == PARCC_ORBIT) {
         float3_copy(context->target, frame.rotation_center);
+        float3_copy(context->orbit_pivot, frame.rotation_center);
         const parcc_float phi = frame.radians[0];
         const parcc_float theta = frame.radians[1];
         const parcc_float x = frame.distance * sin(theta) * cos(phi);
         const parcc_float y = frame.distance * sin(phi);
         const parcc_float z = frame.distance * cos(theta) * cos(phi);
         float3_set(context->eyepos, x, y, z);
-        float3_add(context->eyepos, context->target, context->eyepos);
+        float3_add(context->eyepos, context->orbit_pivot, context->eyepos);
     }
 }
 

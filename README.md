@@ -9,6 +9,9 @@ do `make run`. For other platforms, simply invoke CMake in the way that you norm
 
 - scrolling moves fwd / backwd along the view axes, and does not affect the rotation center
 - dragging both buttons "strafes"; this translates the rotation center as well
+
+- can you replace frame::target with frame::travel_direction?  seems less redundant.
+
 - interpolate_frame for orbit mode
 - refactor magic numbers 100.0 into property: orbit_speed[2]
 

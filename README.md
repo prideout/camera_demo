@@ -7,18 +7,17 @@ do `make run`. For other platforms, simply invoke CMake in the way that you norm
 
 # TODO for Orbit mode
 
-- scrolling moves fwd / backwd along the view axes, and does not affect the rotation center
-- dragging both buttons "strafes"; this translates the rotation center as well
-
-- can you replace frame::target with frame::travel_direction?  seems less redundant.
-
+- implement strafing (translates the orbit_pivot too)
 - interpolate_frame for orbit mode
-- refactor magic numbers 100.0 into property: orbit_speed[2]
 
 # Longer term ideas
 
 - Multi-touch support, especially for zoom.
-- Momentum for panning (this might be implemented in the demo rather than the library)
+- Momentum for panning
+    - Also, sudden movements should be smoothed.
+    - This could be a time-aware utility class (par_camera_animator)
+        - parca_grab_begin, parca_grab_end, parca_grab_begin, parca_zoom, parca_tick)
+- Double-tap to refocus (might be a parca feature)
 - First person mode (sketchfab has this)
 - Demonstrate precision crosshairs for deep zoom, similar to my old blog post.
 - Make a demo that has a "view cube" as seen in tinkercad. See `ImGuizmo` for inspiration.

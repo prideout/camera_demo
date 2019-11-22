@@ -154,8 +154,12 @@ void parcc_get_matrices(const parcc_context* ctx, parcc_float projection[16], pa
 // scaled by distance-to-ground. To prevent zooming in too far, use a non-zero value for
 // map_min_distance.
 //
-// The strafe argument exists only for ORBIT mode and is typically associated with the right
-// mouse button or two-finger dragging. This is used to pan the view.
+// The strafe argument exists only for ORBIT mode and is typically associated with the right mouse
+// button or two-finger dragging. This is used to pan the view. Note that orbit mode maintains a
+// "pivot point" which is initially set to home_target. When flying forward or backward, the pivot
+// does not move. However strafing will cause it to move around. This matches sketchfab behavior.
+// When flying past the orbit point, the controller enters a "flipped" state to prevent the flight
+// direction from suddenly changing.
 
 void parcc_grab_begin(parcc_context* context, int winx, int winy, bool strafe);
 void parcc_grab_update(parcc_context* context, int winx, int winy);
@@ -444,8 +448,19 @@ void parcc_zoom(parcc_context* context, int winx, int winy, parcc_float scrollde
         float3_subtract(gaze, context->target, context->eyepos);
         float3_normalize(gaze);
         float3_scale(gaze, context->props.orbit_zoom_speed * scrolldelta);
+
+        parcc_float v0[3];
+        float3_subtract(v0, context->orbit_pivot, context->eyepos);
+
         float3_add(context->eyepos, context->eyepos, gaze);
         float3_add(context->target, context->target, gaze);
+
+        parcc_float v1[3];
+        float3_subtract(v1, context->orbit_pivot, context->eyepos);
+
+        if (float3_dot(v0, v1) < 0) {
+            context->orbit_flipped = !context->orbit_flipped;
+        }
     }
 }
 

@@ -115,7 +115,7 @@ typedef struct {
     parcc_mode mode;
     union {
         struct { parcc_float extent, center[2]; };
-        struct { parcc_float radians[2], pivot[3], target[3], pivot_distance; };
+        struct { parcc_float phi, theta, pivot_distance, pivot[3]; };
     };
 } parcc_frame;
 
@@ -205,16 +205,15 @@ double parcc_get_interpolation_duration(parcc_frame a, parcc_frame b);
 //
 // MAP mode:
 // - zoom level is represented with the extent of the rectangle formed by the intersection of
-// the
-//   frustum with the viewing plane at home_target. It is either a width or a height, depending
+//   the frustum with the viewing plane at home_target. It is either a width or a height, depending
 //   on fov_orientation.
 // - the pan offset is stored as a 2D vector from home_target that gets projected to map_plane.
 //
 // ORBIT mode:
-// - radians[0] = phi   = X-axis rotation in [-pi/2, +pi/2] (applies first)
-// - radians[1] = theta = Y-axis rotation in [-pi, +pi]     (applies second)
+// - phi   = X-axis rotation in [-pi/2, +pi/2] (applies first)
+// - theta = Y-axis rotation in [-pi, +pi]     (applies second)
 // - pivot is initialized to home_center but might be changed via strafe
-// - target determines the viewing direction
+// - pivot_distance is the distance between eye and pivot (negative distance = orbit_flipped)
 
 typedef enum { PARCC_GRAB_NONE, PARCC_GRAB, PARCC_GRAB_STRAFE } parcc_grab_state;
 
@@ -233,6 +232,7 @@ struct parcc_context_s {
     int grab_winx;
     int grab_winy;
     parcc_float orbit_pivot[3];
+    bool orbit_flipped;
 };
 
 static bool parcc_raycast_plane(const parcc_float origin[3], const parcc_float dir[3],
@@ -390,9 +390,9 @@ void parcc_grab_update(parcc_context* context, int winx, int winy) {
         const parcc_float phi = dely * context->props.orbit_speed[1];
         const parcc_float theta = delx * context->props.orbit_speed[0];
 
-        frame.radians[0] = context->grab_frame.radians[0] + phi;
-        frame.radians[1] = context->grab_frame.radians[1] + theta;
-        frame.radians[0] = PARCC_CLAMP(frame.radians[0], -PARCC_MAX_PHI, PARCC_MAX_PHI);
+        frame.phi = context->grab_frame.phi + phi;
+        frame.theta = context->grab_frame.theta + theta;
+        frame.phi = PARCC_CLAMP(phi, -PARCC_MAX_PHI, PARCC_MAX_PHI);
 
         parcc_goto_frame(context, frame);
     }
@@ -556,16 +556,13 @@ parcc_frame parcc_get_current_frame(const parcc_context* context) {
     if (context->props.mode == PARCC_ORBIT) {
         parcc_float pivot_to_eye[3];
         float3_subtract(pivot_to_eye, context->eyepos, context->orbit_pivot);
-        frame.pivot_distance = float3_length(pivot_to_eye);
-
-        const parcc_float x = pivot_to_eye[0] / frame.pivot_distance;
-        const parcc_float y = pivot_to_eye[1] / frame.pivot_distance;
-        const parcc_float z = pivot_to_eye[2] / frame.pivot_distance;
-
-        frame.radians[0] = asin(y);      // phi
-        frame.radians[1] = atan2(x, z);  // theta
-
-        float3_copy(frame.target, context->target);
+        const parcc_float d = float3_length(pivot_to_eye);
+        const parcc_float x = pivot_to_eye[0] / d;
+        const parcc_float y = pivot_to_eye[1] / d;
+        const parcc_float z = pivot_to_eye[2] / d;
+        frame.phi = asin(y);
+        frame.theta = atan2(x, z);
+        frame.pivot_distance = context->orbit_flipped ? -d : d;
         float3_copy(frame.pivot, context->orbit_pivot);
     }
 
@@ -606,9 +603,7 @@ parcc_frame parcc_get_home_frame(const parcc_context* context) {
     }
 
     if (frame.mode == PARCC_ORBIT) {
-        frame.radians[0] = 0;
-        frame.radians[1] = 0;
-        float3_copy(frame.target, context->props.home_target);
+        frame.theta = frame.phi = 0;
         float3_copy(frame.pivot, context->props.home_target);
         frame.pivot_distance = float3_length(context->props.home_vector);
     }
@@ -648,15 +643,19 @@ void parcc_goto_frame(parcc_context* context, parcc_frame frame) {
     }
 
     if (context->props.mode == PARCC_ORBIT) {
-        float3_copy(context->target, frame.target);
         float3_copy(context->orbit_pivot, frame.pivot);
-        const parcc_float phi = frame.radians[0];
-        const parcc_float theta = frame.radians[1];
-        const parcc_float x = frame.pivot_distance * sin(theta) * cos(phi);
-        const parcc_float y = frame.pivot_distance * sin(phi);
-        const parcc_float z = frame.pivot_distance * cos(theta) * cos(phi);
+        const parcc_float x = sin(frame.theta) * cos(frame.phi);
+        const parcc_float y = sin(frame.phi);
+        const parcc_float z = cos(frame.theta) * cos(frame.phi);
         float3_set(context->eyepos, x, y, z);
-        float3_add(context->eyepos, context->orbit_pivot, context->eyepos);
+        float3_scale(context->eyepos, fabs(frame.pivot_distance));
+        float3_add(context->eyepos, context->eyepos, context->orbit_pivot);
+
+        context->orbit_flipped = frame.pivot_distance < 0;
+
+        float3_set(context->target, x, y, z);
+        float3_scale(context->target, context->orbit_flipped ? 1.0 : -1.0);
+        float3_add(context->target, context->target, context->eyepos);
     }
 }
 

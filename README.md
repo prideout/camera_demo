@@ -7,7 +7,6 @@ do `make run`. For other platforms, simply invoke CMake in the way that you norm
 
 # TODO for Orbit mode
 
-- phi constraint is not enforced
 - scrolling moves fwd / backwd along the view axes, and does not affect the rotation center
 - dragging both buttons "strafes"; this translates the rotation center as well
 - interpolate_frame for orbit mode

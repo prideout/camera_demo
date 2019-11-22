@@ -102,6 +102,7 @@ typedef struct {
 
     // ORBIT-MODE PROPERTIES
     parcc_float home_vector[3];  // (required) vector from home_target to initial eye position
+    parcc_float orbit_speed[2];  // rotational speed (defaults to 0.01)
 
 } parcc_properties;
 
@@ -264,6 +265,12 @@ void parcc_set_properties(parcc_context* context, const parcc_properties* pprops
     if (float4_dot(props.map_plane, props.map_plane) == 0) {
         props.map_plane[2] = 1;
     }
+    if (props.orbit_speed[0] == 0) {
+        props.orbit_speed[0] = 0.01;
+    }
+    if (props.orbit_speed[1] == 0) {
+        props.orbit_speed[1] = 0.01;
+    }
 
     const bool more_constrained = (int)props.map_constraint > (int)context->props.map_constraint;
     const bool orientation_changed = props.fov_orientation != context->props.fov_orientation;
@@ -374,11 +381,14 @@ void parcc_grab_update(parcc_context* context, int winx, int winy) {
         const int delx = context->grab_winx - winx;
         const int dely = context->grab_winy - winy;
 
-        const parcc_float phi = dely / 100.0f;    // ??
-        const parcc_float theta = delx / 100.0f;  // ??
+        const parcc_float phi = dely * context->props.orbit_speed[1];
+        const parcc_float theta = delx * context->props.orbit_speed[0];
 
         frame.radians[0] = context->grab_frame.radians[0] + phi;
         frame.radians[1] = context->grab_frame.radians[1] + theta;
+
+        const parcc_float kPhiConstraint = VEC_PI / 2 - 0.001;
+        frame.radians[0] = PARCC_CLAMP(frame.radians[0], -kPhiConstraint, kPhiConstraint);
 
         parcc_goto_frame(context, frame);
     }

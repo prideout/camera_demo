@@ -7,17 +7,25 @@ do `make run`. For other platforms, simply invoke CMake in the way that you norm
 
 # TODO for Orbit mode
 
-- implement strafing (translates the orbit_pivot too)
+- fix sudden jump. repro:
+    - orbit mode, zoom in by a quite a bit and strafe over to the right mountain
+    - pan in very short bursts downward every so slightly, note the jump that goes UP
 - interpolate_frame for orbit mode
 
-# Longer term ideas
+# TODO
 
-- Multi-touch support, especially for zoom.
-- Momentum for panning
-    - Also, sudden movements should be smoothed.
-    - This could be a time-aware utility class (par_camera_animator)
-        - parca_grab_begin, parca_grab_end, parca_grab_begin, parca_zoom, parca_tick)
-- Double-tap to refocus (might be a parca feature)
-- First person mode (sketchfab has this)
-- Demonstrate precision crosshairs for deep zoom, similar to my old blog post.
-- Make a demo that has a "view cube" as seen in tinkercad. See `ImGuizmo` for inspiration.
+- Ideas for par_camera_controller
+    - Multi-touch support, especially for zoom.
+    - Double-tap to focus.
+    - First person mode (sketchfab has this).
+
+- Create par_camera_animator.h
+    - Time-aware utility class.
+    - Provides momentum for panning.
+    - Sudden movements should be smoothed.
+    - parca_grab_begin, parca_grab_end, parca_grab_begin, parca_zoom, parca_tick.
+    - does not depend on par_camera_control, uses callbacks instead.
+
+- Demo ideas
+    - Demonstrate precision crosshairs for deep zoom, similar to my old blog post.
+    - Implement a view cube as seen in tinkercad. See `ImGuizmo` for inspiration.

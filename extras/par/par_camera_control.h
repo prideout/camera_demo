@@ -1,4 +1,4 @@
-// CAMERA CONTROL :: https://prideout.net/blog/par_camera_control/
+// CAMERA CONTROL :: https://github.com/prideout/par
 // Enables orbit controls (a.k.a. tumble, arcball, trackball) or pan-and-zoom like Google Maps.
 //
 // This simple library controls a camera that orbits or pans over a 3D object or terrain. No
@@ -16,7 +16,7 @@
 // rotation followed by an X-axis rotation. Additionally, the camera can fly forward or backward
 // along the viewing direction.
 //
-// For usage examples, web demos, and additional documentation go to:
+// For a complex usage example, go to:
 // https://github.com/prideout/camera_demo
 //
 // Distributed under the MIT License, see bottom of file.
@@ -228,6 +228,7 @@ struct parcc_context_s {
     parcc_float eyepos[3];
     parcc_float target[3];
     parcc_grab_state grabbing;
+    parcc_float grab_point_pivot[3];
     parcc_float grab_point_far[3];
     parcc_float grab_point_world[3];
     parcc_float grab_point_eyepos[3];
@@ -348,19 +349,21 @@ void parcc_grab_begin(parcc_context* context, int winx, int winy, bool strafe) {
             return;
         }
         parcc_get_ray_far(context, winx, winy, context->grab_point_far);
-        float3_copy(context->grab_point_eyepos, context->eyepos);
-        float3_copy(context->grab_point_target, context->target);
     }
 
     if (context->props.mode == PARCC_ORBIT) {
         context->grab_frame = parcc_get_current_frame(context);
         context->grab_winx = winx;
         context->grab_winy = winy;
+        float3_copy(context->grab_point_pivot, context->orbit_pivot);
     }
+
+    float3_copy(context->grab_point_eyepos, context->eyepos);
+    float3_copy(context->grab_point_target, context->target);
 }
 
 void parcc_grab_update(parcc_context* context, int winx, int winy) {
-    if (context->props.mode == PARCC_MAP && context->grabbing) {
+    if (context->props.mode == PARCC_MAP && context->grabbing == PARCC_GRAB) {
         parcc_float u_vec[3];
         float3_subtract(u_vec, context->grab_point_world, context->grab_point_eyepos);
         const parcc_float u_len = float3_length(u_vec);
@@ -402,7 +405,34 @@ void parcc_grab_update(parcc_context* context, int winx, int winy) {
     }
 
     if (context->props.mode == PARCC_ORBIT && context->grabbing == PARCC_GRAB_STRAFE) {
-        // TODO: strafe
+        parcc_float upward[3];
+
+        parcc_float gaze[3];
+        float3_subtract(gaze, context->target, context->eyepos);
+        float3_normalize(gaze);
+
+        parcc_float right[3];
+        float3_cross(right, gaze, context->props.home_upward);
+        float3_normalize(right);
+
+        float3_cross(upward, right, gaze);
+        float3_normalize(upward);
+
+        const int delx = context->grab_winx - winx;
+        const int dely = context->grab_winy - winy;
+
+        const parcc_float dx = delx * 0.001;
+        const parcc_float dy = dely * 0.001;
+
+        float3_scale(right, dx);
+        float3_scale(upward, dy);
+
+        parcc_float movement[3];
+        float3_add(movement, upward, right);
+
+        float3_add(context->orbit_pivot, context->grab_point_pivot, movement);
+        float3_add(context->eyepos, context->grab_point_eyepos, movement);
+        float3_add(context->target, context->grab_point_target, movement);
     }
 }
 

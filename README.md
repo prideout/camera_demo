@@ -5,11 +5,12 @@ like Google Maps.
 The native demo is easy to build on macOS. First make sure you have CMake and clang installed, then
 do `make run`. For other platforms, simply invoke CMake in the way that you normally do.
 
-# TODO for Orbit mode
+## TODO
 
+- Switching between orbit / map should go to home.
 - interpolate_frame for orbit mode
 
-# TODO
+## Notes
 
 - Ideas for par_camera_controller
     - Multi-touch support, especially for zoom.

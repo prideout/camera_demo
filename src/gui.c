@@ -96,6 +96,7 @@ static void define_ui(Gui* gui) {
 
     static parcc_properties props;
     parcc_get_properties(camera, &props);
+    parcc_properties previous = props;
 
     mu_layout_row(ctx, 2, (int[]){142, -1}, 0);
     mux_radio_buttons((mux_Button[]){{"Orbit mode", PARCC_ORBIT},  //
@@ -135,7 +136,7 @@ static void define_ui(Gui* gui) {
 
     // bottom pane
     mu_layout_row(ctx, 1, (int[]){-1}, 0);
-    if (mu_button(ctx, "Go to Home Frame")) {
+    if (mu_button(ctx, "Go to Home Frame") || previous.mode != props.mode) {
         app_goto_frame(app, parcc_get_home_frame(camera));
     }
 

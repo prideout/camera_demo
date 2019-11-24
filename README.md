@@ -9,7 +9,6 @@ do `make run`. For other platforms, simply invoke CMake in the way that you norm
 
 ## TODO
 
-- Switching between orbit / map should go to home.
 - interpolate_frame for orbit mode
 
 ## Notes

@@ -399,7 +399,7 @@ void parcc_grab_update(parcc_context* context, int winx, int winy) {
 
         frame.phi = context->grab_frame.phi + phi;
         frame.theta = context->grab_frame.theta + theta;
-        frame.phi = PARCC_CLAMP(phi, -PARCC_MAX_PHI, PARCC_MAX_PHI);
+        frame.phi = PARCC_CLAMP(frame.phi, -PARCC_MAX_PHI, PARCC_MAX_PHI);
 
         parcc_goto_frame(context, frame);
     }

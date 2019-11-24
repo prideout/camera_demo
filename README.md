@@ -7,9 +7,6 @@ do `make run`. For other platforms, simply invoke CMake in the way that you norm
 
 # TODO for Orbit mode
 
-- fix sudden jump. repro:
-    - orbit mode, zoom in by a quite a bit and strafe over to the right mountain
-    - pan in very short bursts downward every so slightly, note the jump that goes UP
 - interpolate_frame for orbit mode
 
 # TODO

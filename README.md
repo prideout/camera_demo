@@ -7,10 +7,6 @@ do `make run`. For other platforms, simply invoke CMake in the way that you norm
 
 <img src='https://github.com/prideout/camera_demo/blob/master/extras/screenshot.png'>
 
-## TODO
-
-- interpolate_frame for orbit mode
-
 ## Notes
 
 - Ideas for par_camera_controller

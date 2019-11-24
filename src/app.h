@@ -60,5 +60,6 @@ void app_draw(App* app);
 
 void app_goto_frame(App* app, parcc_frame goal);
 void app_save_frame(App* app, int index);
+void app_clear_frames(App* app);
 
 bool app_intersects_mesh(const float origin[3], const float dir[3], float* t, void* userdata);

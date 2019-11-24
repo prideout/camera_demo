@@ -344,10 +344,6 @@ void app_draw(App* app) {
 void app_goto_frame(App* app, parcc_frame goal) {
     parcc_properties props;
     parcc_get_properties(app->camera_controller, &props);
-    if (props.mode == PARCC_ORBIT) {
-        parcc_goto_frame(app->camera_controller, goal);
-        return;
-    }
     if (app->transition.enabled) {
         return;
     }
@@ -360,4 +356,9 @@ void app_goto_frame(App* app, parcc_frame goal) {
 void app_save_frame(App* app, int index) {
     app->saved_frame[index] = parcc_get_current_frame(app->camera_controller);
     app->has_frame[index] = true;
+}
+
+void app_clear_frames(App* app) {
+    app->has_frame[0] = false;
+    app->has_frame[1] = false;
 }

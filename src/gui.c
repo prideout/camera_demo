@@ -103,6 +103,11 @@ static void define_ui(Gui* gui) {
                                      {"Map mode", PARCC_MAP}},     //
                       ctx, (int*)&props.mode, 2);
 
+    if (previous.mode != props.mode) {
+        app_goto_frame(app, parcc_get_home_frame(camera));
+        app_clear_frames(app);
+    }
+
     mux_radio_buttons((mux_Button[]){{"Vertical FOV", PARCC_VERTICAL},       //
                                      {"Horizontal FOV", PARCC_HORIZONTAL}},  //
                       ctx, (int*)&props.fov_orientation, 2);
@@ -136,7 +141,7 @@ static void define_ui(Gui* gui) {
 
     // bottom pane
     mu_layout_row(ctx, 1, (int[]){-1}, 0);
-    if (mu_button(ctx, "Go to Home Frame") || previous.mode != props.mode) {
+    if (mu_button(ctx, "Go to Home Frame")) {
         app_goto_frame(app, parcc_get_home_frame(camera));
     }
 

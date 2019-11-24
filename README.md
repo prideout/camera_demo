@@ -1,9 +1,11 @@
-This repo contains demos and docs for the [par_camera_control.h](https://github.com/prideout/par),
+This is a demo for [par_camera_control.h](https://github.com/prideout/par),
 a one-file C library that enables orbit controls (a.k.a. tumble, arcball, trackball) or pan-and-zoom
 like Google Maps.
 
 The native demo is easy to build on macOS. First make sure you have CMake and clang installed, then
 do `make run`. For other platforms, simply invoke CMake in the way that you normally do.
+
+<img src='https://github.com/prideout/camera_demo/blob/master/extras/screenshot.png'>
 
 ## TODO
 
